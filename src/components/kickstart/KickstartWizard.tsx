@@ -524,7 +524,7 @@ export default function KickstartWizard() {
             <SummaryRow label="Sprinter" value={`${values.sprint_estimate} sprinter`} />
             <SummaryRow label="Beskrivelse" value={values.short_description} />
             <div className="mt-4 p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
-              Claude vil generere en komplett PROJECT.md med alle 20+ seksjoner basert på MLIT-standardene (42 regler, 10/10-kvalitet). Dette tar 2–5 minutter.
+              Claude vil generere en komplett PROJECT.md (~100 000 tokens, 12 deler) basert på MLIT-standardene (42 regler, 10/10-kvalitet). Dette tar 10–20 minutter.
             </div>
           </div>
         )}

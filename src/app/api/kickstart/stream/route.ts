@@ -35,13 +35,14 @@ function toFormData(p: KickstartProject): WizardFormData {
 
 function verifyContent(md: string): { ok: boolean; checks: VerifyCheck[] } {
   const checks: VerifyCheck[] = [
-    { label: "Del 1 fullført (>15 000 tegn)",  ok: md.length > 15_000 },
-    { label: "Del 2 til stede (>30 000 tegn)", ok: md.length > 30_000 },
-    { label: "Sprintplan",                     ok: /sprint[\s-]?plan|sprintplan|sprint\s+\d/i.test(md) },
-    { label: "SQL / datamodell",               ok: /CREATE TABLE|datamodell|SQL|schema/i.test(md) },
-    { label: "SEO / AEO",                      ok: /SEO|AEO|JSON-LD|meta.{0,20}description/i.test(md) },
-    { label: "AGENTS.md",                      ok: /AGENTS/i.test(md) },
-    { label: "Pre-launch sjekkliste",          ok: /pre.launch|prelaunch|launch/i.test(md) },
+    { label: "Del 1–3 fullført (>40 000 tegn)",  ok: md.length > 40_000 },
+    { label: "Del 4–6 til stede (>80 000 tegn)", ok: md.length > 80_000 },
+    { label: "Sprintplan",                        ok: /sprint[\s-]?plan|sprintplan|sprint\s+\d/i.test(md) },
+    { label: "SQL / datamodell",                  ok: /CREATE TABLE|datamodell|SQL|schema/i.test(md) },
+    { label: "SEO / AEO",                         ok: /SEO|AEO|JSON-LD|meta.{0,20}description/i.test(md) },
+    { label: "AGENTS.md",                         ok: /AGENTS/i.test(md) },
+    { label: "Pre-launch sjekkliste",             ok: /pre.launch|prelaunch|launch/i.test(md) },
+    { label: "Full spec (>100 000 tegn)",         ok: md.length > 100_000 },
   ];
   return { ok: checks.every(c => c.ok), checks };
 }

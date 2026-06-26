@@ -308,25 +308,30 @@ export default function KickstartWizard() {
             <Field label="Kontaktperson (navn + e-post)">
               <input {...register("contact_person")} className={inp()} placeholder="Kari Nordmann — kari@acme.no" />
             </Field>
-            <Row2>
-              <Field label="Nytt domene">
-                <input {...register("new_domain")} className={inp()} placeholder="acme.no" />
-              </Field>
-              <Field label="Eksisterende nettsted (migrering)">
-                <input {...register("existing_url")} className={inp()} placeholder="https://gammel.acme.no" />
-              </Field>
-            </Row2>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="requires_scrape"
-                checked={values.requires_scrape}
-                onChange={(e) => setValue("requires_scrape", e.target.checked)}
-                className="w-4 h-4 text-blue-600"
-              />
-              <label htmlFor="requires_scrape" className="text-sm text-gray-700">
-                Scrape eksisterende nettsted og importer innhold
-              </label>
+            <Field label="Nytt domene">
+              <input {...register("new_domain")} className={inp()} placeholder="acme.no" />
+            </Field>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="requires_scrape"
+                  checked={values.requires_scrape}
+                  onChange={(e) => setValue("requires_scrape", e.target.checked)}
+                  className="w-4 h-4 text-blue-600"
+                />
+                <label htmlFor="requires_scrape" className="text-sm text-gray-700">
+                  Scrape eksisterende nettsted og importer innhold
+                </label>
+              </div>
+              {values.requires_scrape && (
+                <input
+                  {...register("existing_url")}
+                  className={inp()}
+                  placeholder="https://gammel.acme.no"
+                  autoFocus
+                />
+              )}
             </div>
           </>
         )}

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { KickstartProject, PriceEstimate, BootstrapResult } from "@/lib/kickstart/types";
 
@@ -7,55 +7,110 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
   const [project, setProject] = useState(initial);
   const [generating, setGenerating] = useState(false);
   const [genLog, setGenLog] = useState<string[]>([]);
+  const [liveText, setLiveText] = useState("");
+  const [currentPartTitle, setCurrentPartTitle] = useState("");
   const [estimating, setEstimating] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
   const [bootLog, setBootLog] = useState<string[]>([]);
   const [estimate, setEstimate] = useState<PriceEstimate | null>(initial.price_estimate);
+  const liveRef = useRef<HTMLPreElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (liveRef.current) liveRef.current.scrollTop = liveRef.current.scrollHeight;
+  }, [liveText]);
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [genLog]);
 
   async function generateSpec() {
     setGenerating(true);
     setGenLog(["Starter generering..."]);
-    const res = await fetch("/api/kickstart/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_name: project.client_name,
-        project_name: project.project_name,
-        project_type: project.project_type,
-        tech_stack: project.tech_stack,
-        primary_color: project.primary_color ?? "",
-        short_description: project.short_description ?? "",
-        long_description: project.long_description ?? "",
-      }),
-    });
+    setLiveText("");
+    setCurrentPartTitle("");
 
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullMd = "";
+    try {
+      const res = await fetch("/api/kickstart/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          client_name:       project.client_name,
+          project_name:      project.project_name,
+          contact_person:    project.contact_person ?? "",
+          new_domain:        project.new_domain ?? "",
+          existing_url:      project.existing_url ?? "",
+          project_type:      project.project_type,
+          auth_type:         project.auth_type ?? "supabase-auth",
+          sprint_estimate:   project.sprint_estimate ?? 6,
+          requires_scrape:   project.requires_scrape ?? false,
+          tech_stack:        project.tech_stack ?? [],
+          integrations:      project.integrations ?? [],
+          design_direction:  project.design_direction ?? "",
+          primary_color:     project.primary_color ?? "#3B82F6",
+          secondary_color:   project.secondary_color ?? "",
+          motion_preference: project.motion_preference ?? "subtil",
+          features:          project.features ?? "",
+          extra_notes:       project.extra_notes ?? "",
+          short_description: project.short_description ?? "",
+          long_description:  project.long_description ?? "",
+        }),
+      });
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
+      if (!res.ok || !res.body) {
+        setGenLog((p) => [...p, `❌ Serverfeil: ${res.status}`]);
+        return;
+      }
 
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        const event = JSON.parse(line.slice(5).trim());
-        if (event.type === "part") {
-          setGenLog((prev) => [...prev, `✓ ${event.title}`]);
-          fullMd += (fullMd ? "\n\n---\n\n" : "") + event.content;
-        } else if (event.type === "done") {
-          setProject((p) => ({ ...p, project_md: fullMd, status: "generated" }));
-          setGenLog((prev) => [...prev, "✅ PROJECT.md generert og lagret"]);
-        } else if (event.type === "error") {
-          setGenLog((prev) => [...prev, `❌ ${event.message}`]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          let event: Record<string, unknown>;
+          try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
+
+          if (event.type === "start_part") {
+            setCurrentPartTitle(event.title as string);
+            setLiveText("");
+            setGenLog((p) => [...p, `Genererer: ${event.title as string}`]);
+          } else if (event.type === "delta") {
+            setLiveText((p) => p + (event.text as string));
+          } else if (event.type === "part") {
+            setGenLog((p) => {
+              const next = [...p];
+              let idx = -1;
+              for (let j = next.length - 1; j >= 0; j--) {
+                if (next[j].startsWith("Genererer:")) { idx = j; break; }
+              }
+              if (idx !== -1) next[idx] = `✓ ${event.title as string}`;
+              return next;
+            });
+            setLiveText("");
+            setCurrentPartTitle("");
+          } else if (event.type === "done") {
+            setProject((p) => ({ ...p, project_md: (event as { project_md: string }).project_md, status: "generated" }));
+            setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
+            setLiveText("");
+            setCurrentPartTitle("");
+          } else if (event.type === "error") {
+            setGenLog((p) => [...p, `❌ ${event.message as string}`]);
+          }
         }
       }
+    } catch (e) {
+      setGenLog((p) => [...p, `❌ Nettverksfeil: ${(e as Error).message}`]);
+    } finally {
+      setGenerating(false);
     }
-    setGenerating(false);
   }
 
   async function getEstimate() {
@@ -116,6 +171,8 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
     setBootstrapping(false);
   }
 
+  const hasFailed = genLog.some((l) => l.startsWith("❌"));
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -165,8 +222,34 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
       </div>
 
       {genLog.length > 0 && (
-        <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm text-green-400 space-y-1">
-          {genLog.map((l, i) => <div key={i}>{l}</div>)}
+        <div className="bg-gray-950 rounded-xl overflow-hidden">
+          {currentPartTitle && (
+            <div className="px-4 py-2 border-b border-gray-800 text-xs text-gray-400 font-mono truncate">
+              {currentPartTitle}
+            </div>
+          )}
+          <div ref={logRef} className="px-4 py-3 font-mono text-xs space-y-0.5 max-h-40 overflow-y-auto">
+            {genLog.map((l, i) => (
+              <div key={i} className={
+                l.startsWith("✓") ? "text-green-400"
+                : l.startsWith("❌") ? "text-red-400"
+                : l.startsWith("PROJECT.md") ? "text-green-300 font-bold"
+                : l.startsWith("Genererer:") ? "text-blue-400"
+                : "text-gray-400"
+              }>
+                {l.startsWith("Genererer:") ? `▶ ${l.replace("Genererer: ", "")}` : l}
+              </div>
+            ))}
+            {!hasFailed && generating && <div className="text-blue-400 animate-pulse">▋</div>}
+          </div>
+          {liveText && (
+            <pre
+              ref={liveRef}
+              className="border-t border-gray-800 px-4 py-3 font-mono text-xs text-green-300 leading-relaxed overflow-y-auto max-h-72 whitespace-pre-wrap break-words"
+            >
+              {liveText}
+            </pre>
+          )}
         </div>
       )}
 

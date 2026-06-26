@@ -34,6 +34,7 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
 
     let localProjectId: string | null = project.id;
     let localNextPart = 2;
+    let generationCompleted = false;
 
     async function readStream(fetchBody: object): Promise<"done" | "continue" | "error"> {
       let res: Response;
@@ -106,6 +107,7 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
           } else if ((event as { type: string }).type === "github_updated") {
             setGenLog((p) => [...p, `✓ GitHub oppdatert`]);
           } else if (event.type === "done") {
+            generationCompleted = true;
             setProject((p) => ({ ...p, project_md: (event as { project_md: string }).project_md, status: "generated" }));
             setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
             setLiveText("");
@@ -121,10 +123,15 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
     }
 
     try {
-      // Send eksisterende project_id + regenerate:true — oppdaterer samme prosjekt
       let result = await readStream({ project_id: project.id, regenerate: true });
       while (result === "continue" && localProjectId) {
         result = await readStream({ project_id: localProjectId, part: localNextPart });
+      }
+      if (!generationCompleted && result !== "error") {
+        setGenLog((p) => [
+          ...p,
+          `⚠️ Avbrutt etter Del ${localNextPart - 1} av 12. Prøv "Regenerer spec" på nytt.`,
+        ]);
       }
     } finally {
       setGenerating(false);

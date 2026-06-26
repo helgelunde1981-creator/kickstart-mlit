@@ -104,6 +104,7 @@ export default function KickstartWizard() {
     setCurrentPartTitle("");
 
     let gotError = false;
+    let generationCompleted = false;
     let localProjectId: string | null = null;
     let localNextPart = 2;
 
@@ -169,6 +170,7 @@ export default function KickstartWizard() {
             setGenLog((p) => [...p, `Del ${nextPart - 1} lagret ✓ — starter Del ${nextPart}...`]);
             return "continue";
           } else if (event.type === "done") {
+            generationCompleted = true;
             setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
             setLiveText("");
             setCurrentPartTitle("");
@@ -189,7 +191,19 @@ export default function KickstartWizard() {
     }
     if (result === "error") gotError = true;
 
-    if (!gotError) setSubmitting(false);
+    if (gotError) {
+      setSubmitting(false); // vis wizard igjen for retry ved ekte feil
+    } else if (!generationCompleted) {
+      // Avbrutt stille (nettverkshiccup, mobil, o.l.) — hold genereringsskjermen oppe
+      setGenLog((p) => [
+        ...p,
+        `⚠️ Avbrutt etter Del ${localNextPart - 1} av 12. Prosjektet er delvis lagret.`,
+        localProjectId
+          ? `Gå til prosjektlisten og bruk "Regenerer spec" på "${getValues().project_name}".`
+          : "Prøv å starte på nytt.",
+      ]);
+    }
+    // Hvis generationCompleted: done-skjermen vises automatisk via setDone(true)
   }
 
   if (done && createdId) {

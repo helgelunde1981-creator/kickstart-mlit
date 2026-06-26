@@ -17,7 +17,9 @@ export async function POST(req: NextRequest) {
       };
 
       try {
+        console.log(`[stream] POST /api/kickstart/stream — klient="${body.client_name}" prosjekt="${body.project_name}"`);
         const project = await createProject(body);
+        console.log(`[stream] Prosjekt opprettet id=${project.id}`);
         send({ type: "project_id", id: project.id });
 
         let fullMd = "";
@@ -35,7 +37,9 @@ export async function POST(req: NextRequest) {
           }
         }
       } catch (e) {
-        send({ type: "error", message: (e as Error).message });
+        const msg = (e as Error).message;
+        console.error(`[stream] FEIL: ${msg}`, e);
+        send({ type: "error", message: msg });
       } finally {
         controller.close();
       }

@@ -17,8 +17,11 @@ export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<Str
   const userPrompt = buildGenerationPrompt(data);
   const parts: string[] = [];
 
+  console.log(`[kickstart] START generate — prosjekt="${data.project_name}" klient="${data.client_name}" retning="${data.design_direction}"`);
+
   for (let i = 0; i < 5; i++) {
     yield { type: "start_part", part: i + 1, title: PART_TITLES[i] };
+    console.log(`[kickstart] Del ${i + 1}/5 starter — ${PART_TITLES[i].substring(0, 60)}…`);
 
     const messages: Anthropic.MessageParam[] = [
       { role: "user", content: userPrompt },
@@ -48,17 +51,21 @@ export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<Str
     });
 
     let partContent = "";
+    let tokenCount = 0;
     for await (const chunk of stream) {
       if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
         partContent += chunk.delta.text;
+        tokenCount++;
         yield { type: "delta", text: chunk.delta.text };
       }
     }
 
+    console.log(`[kickstart] Del ${i + 1}/5 ferdig — ${partContent.length} tegn, ${tokenCount} delta-events`);
     parts.push(partContent);
     yield { type: "part", part: i + 1, title: PART_TITLES[i], content: partContent };
   }
 
   const project_md = parts.join("\n\n---\n\n");
+  console.log(`[kickstart] DONE — total ${project_md.length} tegn`);
   yield { type: "done", project_md };
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { streamProjectMd } from "@/lib/kickstart/generate";
-import { createProject, updateProjectMd } from "@/lib/kickstart/queries";
+import { createProject, updateProjectMd, savePartialMd } from "@/lib/kickstart/queries";
 import { WizardFormData } from "@/lib/kickstart/types";
 
 export const runtime = "nodejs";
@@ -35,12 +35,18 @@ export async function POST(req: NextRequest) {
         // Heartbeat every 10s keeps Cloudflare from closing idle connection between parts
         heartbeat = setInterval(() => enqueue(": heartbeat\n\n"), 10_000);
 
+        const completedParts: string[] = [];
+
         for await (const event of streamProjectMd(body)) {
           if (event.type === "start_part") {
             send({ type: "start_part", part: event.part, title: event.title });
           } else if (event.type === "delta") {
             send({ type: "delta", text: event.text });
           } else if (event.type === "part") {
+            completedParts.push(event.content);
+            // Lagre etter hver del — hvis Del 2 timer ut har vi alltid Del 1
+            await savePartialMd(project.id, completedParts.join("\n\n---\n\n"));
+            console.log(`[stream] Del ${event.part} lagret (${event.content.length} tegn)`);
             send({ type: "part", part: event.part, title: event.title });
           } else if (event.type === "done") {
             await updateProjectMd(project.id, event.project_md);

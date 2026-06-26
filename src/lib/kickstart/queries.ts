@@ -60,6 +60,14 @@ export async function updateProjectMd(id: string, project_md: string): Promise<v
   if (error) throw error;
 }
 
+export async function savePartialMd(id: string, project_md: string): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("kickstart_projects")
+    .update({ project_md })
+    .eq("id", id);
+  if (error) console.error(`[queries] savePartialMd feil: ${error.message}`);
+}
+
 export async function updateProjectEstimate(id: string, price_estimate: object): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("kickstart_projects")

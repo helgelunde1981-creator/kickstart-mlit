@@ -43,7 +43,7 @@ export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<Str
 
     const stream = await client.messages.stream({
       model: "claude-sonnet-4-6",
-      max_tokens: 8000,
+      max_tokens: 4000,
       system: systemPrompt || "Du er Senior Design-Tech Architect for Myrvoll-Lunde IT Drift. Lever 10/10-kvalitet på alt.",
       messages,
     });

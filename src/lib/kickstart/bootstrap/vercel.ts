@@ -33,6 +33,16 @@ export async function createVercelProject(
 
   if (!res.ok) {
     const err = await res.json();
+    // Prosjekt finnes allerede — hent eksisterende ID
+    if ((err.error?.message ?? "").toLowerCase().includes("already exists")) {
+      const existing = await fetch(`https://api.vercel.com/v9/projects/${slug}?teamId=${teamId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (existing.ok) {
+        const existingProject = await existing.json();
+        return existingProject.id;
+      }
+    }
     throw new Error(`Vercel prosjektoppretting feilet: ${err.error?.message ?? JSON.stringify(err)}`);
   }
 

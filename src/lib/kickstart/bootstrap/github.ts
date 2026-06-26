@@ -24,6 +24,17 @@ export async function createGitHubRepo(
 
   if (!createRes.ok) {
     const err = await createRes.json();
+    // Repo finnes allerede — bruk det eksisterende
+    if (createRes.status === 422) {
+      const existing = await fetch(`https://api.github.com/repos/${owner}/${repoName}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+      });
+      if (existing.ok) {
+        const existingRepo = await existing.json();
+        await addFileToRepo(token, owner, repoName, "PROJECT.md", projectMd);
+        return existingRepo.html_url;
+      }
+    }
     throw new Error(`GitHub repo-oppretting feilet: ${err.message}`);
   }
 

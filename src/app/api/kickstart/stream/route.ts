@@ -37,7 +37,7 @@ function verifyContent(md: string): { ok: boolean; checks: VerifyCheck[] } {
   const checks: VerifyCheck[] = [
     { label: "Del 1 fullført (>15 000 tegn)",  ok: md.length > 15_000 },
     { label: "Del 2 til stede (>30 000 tegn)", ok: md.length > 30_000 },
-    { label: "Sprintplan",                     ok: /sprint[\s-]?plan|sprintplan/i.test(md) },
+    { label: "Sprintplan",                     ok: /sprint[\s-]?plan|sprintplan|sprint\s+\d/i.test(md) },
     { label: "SQL / datamodell",               ok: /CREATE TABLE|datamodell|SQL|schema/i.test(md) },
     { label: "SEO / AEO",                      ok: /SEO|AEO|JSON-LD|meta.{0,20}description/i.test(md) },
     { label: "AGENTS.md",                      ok: /AGENTS/i.test(md) },

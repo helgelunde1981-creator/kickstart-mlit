@@ -27,9 +27,11 @@ export function buildGenerationPrompt(data: WizardFormData): string {
   const qualityGates = readStandardsFile("04-QUALITY_GATES.md");
   const brandVoice   = readStandardsFile("05-BRAND_VOICE.md");
 
-  const techLabels = data.tech_stack.map(id => label(id, TECH_OPTIONS)).join(", ");
-  const integrationLabels = data.integrations.length
-    ? data.integrations.map(id => label(id, INTEGRATION_OPTIONS)).join(", ")
+  const techStack = data.tech_stack ?? [];
+  const integrations = data.integrations ?? [];
+  const techLabels = techStack.map(id => label(id, TECH_OPTIONS)).join(", ");
+  const integrationLabels = integrations.length
+    ? integrations.map(id => label(id, INTEGRATION_OPTIONS)).join(", ")
     : "Ingen ekstra integrasjoner";
   const motionLabel  = label(data.motion_preference, MOTION_OPTIONS);
   const authLabel    = label(data.auth_type, AUTH_OPTIONS);

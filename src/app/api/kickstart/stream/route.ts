@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        console.log(`[stream] POST /api/kickstart/stream — klient="${body.client_name}" prosjekt="${body.project_name}"`);
+        console.log(`[stream] POST — klient="${body.client_name}" tech=${JSON.stringify(body.tech_stack?.length)} integrations=${JSON.stringify(body.integrations?.length ?? "undefined")}`);
         const project = await createProject(body);
         console.log(`[stream] Prosjekt opprettet id=${project.id}`);
         send({ type: "project_id", id: project.id });

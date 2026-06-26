@@ -40,8 +40,7 @@ export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<
       max_tokens: 16384,
       system: systemPrompt || "Du er en ekspert systemarkitekt hos Myrvoll-Lunde IT Drift.",
       messages,
-      betas: ["output-128k-2025-02-19"],
-    } as Parameters<typeof client.messages.stream>[0]);
+    });
 
     let partContent = "";
     for await (const chunk of stream) {

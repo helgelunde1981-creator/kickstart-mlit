@@ -23,8 +23,9 @@ export const TECH_OPTIONS: TechOption[] = [
   { id: "supabase-auth", label: "Supabase Auth", category: "Auth" },
   { id: "nextauth", label: "NextAuth.js", category: "Auth" },
   { id: "clerk", label: "Clerk", category: "Auth" },
-  // Hosting
+  // Hosting / VCS
   { id: "vercel", label: "Vercel", category: "Hosting" },
+  { id: "github", label: "GitHub", category: "Hosting" },
   { id: "fly", label: "Fly.io", category: "Hosting" },
   { id: "railway", label: "Railway", category: "Hosting" },
   // Other

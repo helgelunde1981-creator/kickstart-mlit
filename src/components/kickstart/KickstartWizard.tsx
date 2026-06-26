@@ -31,7 +31,7 @@ export default function KickstartWizard() {
       client_name: "",
       project_name: "",
       project_type: "",
-      tech_stack: [],
+      tech_stack: ["nextjs", "typescript", "tailwind", "shadcn", "supabase", "supabase-auth", "vercel", "resend"],
       primary_color: "#3B82F6",
       short_description: "",
       long_description: "",
@@ -58,36 +58,50 @@ export default function KickstartWizard() {
     setSubmitting(true);
     setGenLog(["Starter generering av PROJECT.md..."]);
 
-    const res = await fetch("/api/kickstart/stream", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(getValues()),
-    });
+    let gotError = false;
+    try {
+      const res = await fetch("/api/kickstart/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(getValues()),
+      });
 
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+      if (!res.ok || !res.body) {
+        setGenLog((p) => [...p, `❌ Serverfeil: ${res.status} ${res.statusText}`]);
+        gotError = true;
+      } else {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-    while (true) {
-      const { done: rdone, value } = await reader.read();
-      if (rdone) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
+        while (true) {
+          const { done: rdone, value } = await reader.read();
+          if (rdone) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
 
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        const event = JSON.parse(line.slice(5).trim());
-        if (event.type === "project_id") setCreatedId(event.id);
-        else if (event.type === "part") setGenLog((p) => [...p, `✓ ${event.title}`]);
-        else if (event.type === "done") {
-          setGenLog((p) => [...p, "✅ PROJECT.md generert og lagret!"]);
-          setDone(true);
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const event = JSON.parse(line.slice(5).trim());
+            if (event.type === "project_id") setCreatedId(event.id);
+            else if (event.type === "part") setGenLog((p) => [...p, `✓ ${event.title}`]);
+            else if (event.type === "done") {
+              setGenLog((p) => [...p, "✅ PROJECT.md generert og lagret!"]);
+              setDone(true);
+            } else if (event.type === "error") {
+              setGenLog((p) => [...p, `❌ ${event.message}`]);
+              gotError = true;
+            }
+          }
         }
-        else if (event.type === "error") setGenLog((p) => [...p, `❌ ${event.message}`]);
       }
+    } catch (e) {
+      setGenLog((p) => [...p, `❌ Nettverksfeil: ${(e as Error).message}`]);
+      gotError = true;
     }
-    setSubmitting(false);
+
+    if (!gotError) setSubmitting(false);
   }
 
   if (done && createdId) {
@@ -107,13 +121,26 @@ export default function KickstartWizard() {
   }
 
   if (submitting) {
+    const hasFailed = genLog.some((l) => l.startsWith("❌"));
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Genererer PROJECT.md...</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">
+          {hasFailed ? "Generering feilet" : "Genererer PROJECT.md..."}
+        </h2>
         <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm text-green-400 space-y-1 min-h-32">
-          {genLog.map((l, i) => <div key={i}>{l}</div>)}
-          <div className="animate-pulse">▋</div>
+          {genLog.map((l, i) => (
+            <div key={i} className={l.startsWith("❌") ? "text-red-400" : undefined}>{l}</div>
+          ))}
+          {!hasFailed && <div className="animate-pulse">▋</div>}
         </div>
+        {hasFailed && (
+          <button
+            onClick={() => { setSubmitting(false); setGenLog([]); }}
+            className="mt-4 text-sm text-gray-500 hover:text-gray-700"
+          >
+            ← Prøv igjen
+          </button>
+        )}
       </div>
     );
   }

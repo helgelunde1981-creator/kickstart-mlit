@@ -22,9 +22,13 @@ export async function POST(req: NextRequest) {
 
         let fullMd = "";
         for await (const event of streamProjectMd(body)) {
-          if (event.type === "part") {
-            send({ type: "part", part: event.part, title: event.title, content: event.content });
+          if (event.type === "start_part") {
+            send({ type: "start_part", part: event.part, title: event.title });
+          } else if (event.type === "delta") {
+            send({ type: "delta", text: event.text });
+          } else if (event.type === "part") {
             fullMd += (fullMd ? "\n\n---\n\n" : "") + event.content;
+            send({ type: "part", part: event.part, title: event.title });
           } else if (event.type === "done") {
             await updateProjectMd(project.id, event.project_md);
             send({ type: "done", id: project.id });
@@ -43,6 +47,7 @@ export async function POST(req: NextRequest) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }

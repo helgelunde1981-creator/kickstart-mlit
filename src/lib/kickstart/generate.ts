@@ -1,44 +1,49 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { buildGenerationPrompt, getSystemPrompt } from "./standards";
-import { WizardFormData } from "./types";
+import { WizardFormData, StreamEvent } from "./types";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const PART_TITLES = [
-  "Del 1: Prosjektoversikt og mål",
-  "Del 2: Teknisk arkitektur",
-  "Del 3: Datamodell og API",
-  "Del 4: UI/UX og komponenter",
-  "Del 5: Implementasjonsplan og deploy",
+  "Del 1 av 5 — Visjon, designretning, konkurrenter, brand voice, signature moment, anti-template-sjekkliste",
+  "Del 2 av 5 — Kundeinfo, tech-stack, designsystem som kode (CSS tokens + Tailwind), funksjonell spec + feature-deep-dives, CMS-krav",
+  "Del 3 av 5 — Sider og URL-struktur (CMS-coverage per side), datamodell (SQL + RLS), SEO + AEO + JSON-LD + sted×tjeneste-grid",
+  "Del 4 av 5 — Sikkerhet (CSP + RLS + secrets), GDPR/compliance, e-postmaler, DNS, analytics, monitoring, CI/CD-flyt",
+  "Del 5 av 5 — Komplett sprintplan (alle oppgaver eksplisitt), Project Memory bootstrap, AGENTS.md, Auto-evaluator, Pre-launch verify, post-launch survey, self-review + spørsmål til kunden + risiko + suksesskriterier",
 ];
 
-export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<
-  { type: "part"; part: number; title: string; content: string } | { type: "done"; project_md: string }
-> {
+export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<StreamEvent> {
   const systemPrompt = getSystemPrompt();
   const userPrompt = buildGenerationPrompt(data);
   const parts: string[] = [];
 
   for (let i = 0; i < 5; i++) {
-    const partPrompt = i === 0
-      ? userPrompt + `\n\nGenerer nå KUN ${PART_TITLES[i]}. Start direkte med innholdet.`
-      : `Generer nå KUN ${PART_TITLES[i]} for prosjektet. Fortsett fra de forrige delene.`;
+    yield { type: "start_part", part: i + 1, title: PART_TITLES[i] };
 
     const messages: Anthropic.MessageParam[] = [
       { role: "user", content: userPrompt },
     ];
 
     if (i > 0) {
-      messages.push({ role: "assistant", content: parts.slice(0, i).join("\n\n") });
-      messages.push({ role: "user", content: `Generer nå KUN ${PART_TITLES[i]}. Start direkte med innholdet.` });
+      messages.push({
+        role: "assistant",
+        content: parts.join("\n\n---\n\n"),
+      });
+      messages.push({
+        role: "user",
+        content: `Fortsett PROJECT.md. Generer nå KUN ${PART_TITLES[i]}. Start direkte med innholdet — ikke gjenta noe fra delene over.`,
+      });
     } else {
-      messages[0] = { role: "user", content: partPrompt };
+      messages[0] = {
+        role: "user",
+        content: userPrompt + `\n\n---\n\nGenerer nå KUN ${PART_TITLES[i]}. Start direkte med innholdet (# overskrift og videre).`,
+      };
     }
 
     const stream = await client.messages.stream({
       model: "claude-sonnet-4-6",
-      max_tokens: 16384,
-      system: systemPrompt || "Du er en ekspert systemarkitekt hos Myrvoll-Lunde IT Drift.",
+      max_tokens: 16000,
+      system: systemPrompt || "Du er Senior Design-Tech Architect for Myrvoll-Lunde IT Drift. Lever 10/10-kvalitet på alt.",
       messages,
     });
 
@@ -46,6 +51,7 @@ export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<
     for await (const chunk of stream) {
       if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
         partContent += chunk.delta.text;
+        yield { type: "delta", text: chunk.delta.text };
       }
     }
 

@@ -4,11 +4,10 @@ import { WizardFormData, StreamEvent } from "./types";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// 3 deler holder seg godt under Vercels 300s-grense (var 5 × ~60s = timeout)
+// 2 deler = maks ~2 min totalt (trygt under Vercels 300s og brukerens 2-min-ønske)
 const PART_TITLES = [
-  "Del 1 av 3 — Visjon, designretning, brand voice, signature moment, designsystem (CSS tokens + Tailwind), konkurrenter, anti-template-sjekkliste",
-  "Del 2 av 3 — Kundeinfo, tech-stack, funksjonell spec + feature-deep-dives, sider og URL-struktur, datamodell (SQL + RLS), SEO + AEO + JSON-LD, sikkerhet (CSP + RLS), GDPR, DNS, analytics, monitoring",
-  "Del 3 av 3 — Komplett sprintplan (alle oppgaver eksplisitt), CI/CD-flyt, e-postmaler, Project Memory bootstrap, AGENTS.md, Pre-launch verify, post-launch survey, self-review, spørsmål til kunden, risiko + suksesskriterier",
+  "Del 1 av 2 — Visjon, designretning, brand voice, signature moment, designsystem (CSS tokens + Tailwind), konkurrenter, anti-template-sjekkliste, kundeinfo, tech-stack, funksjonell spec + feature-deep-dives, CMS-krav",
+  "Del 2 av 2 — Sider og URL-struktur, datamodell (SQL + RLS), SEO + AEO + JSON-LD, sikkerhet (CSP + RLS + secrets), GDPR, DNS, analytics, monitoring, CI/CD-flyt, komplett sprintplan (alle oppgaver eksplisitt), e-postmaler, Project Memory bootstrap, AGENTS.md, Pre-launch verify, spørsmål til kunden, risiko + suksesskriterier",
 ];
 
 export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<StreamEvent> {
@@ -18,9 +17,9 @@ export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<Str
 
   console.log(`[kickstart] START generate — prosjekt="${data.project_name}" klient="${data.client_name}" retning="${data.design_direction}"`);
 
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     yield { type: "start_part", part: i + 1, title: PART_TITLES[i] };
-    console.log(`[kickstart] Del ${i + 1}/3 starter — ${PART_TITLES[i].substring(0, 60)}…`);
+    console.log(`[kickstart] Del ${i + 1}/2 starter — ${PART_TITLES[i].substring(0, 60)}…`);
 
     const messages: Anthropic.MessageParam[] = [
       { role: "user", content: userPrompt },
@@ -59,7 +58,7 @@ export async function* streamProjectMd(data: WizardFormData): AsyncGenerator<Str
       }
     }
 
-    console.log(`[kickstart] Del ${i + 1}/3 ferdig — ${partContent.length} tegn, ${tokenCount} delta-events`);
+    console.log(`[kickstart] Del ${i + 1}/2 ferdig — ${partContent.length} tegn, ${tokenCount} delta-events`);
     parts.push(partContent);
     yield { type: "part", part: i + 1, title: PART_TITLES[i], content: partContent };
   }

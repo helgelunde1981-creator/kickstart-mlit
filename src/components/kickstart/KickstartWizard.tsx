@@ -14,6 +14,7 @@ import {
 } from "@/lib/kickstart/tech-options";
 import ChipSelector from "./ChipSelector";
 import ColorPicker from "./ColorPicker";
+import DesignDirectionPreview from "./DesignDirectionPreview";
 
 const STEPS = [
   "Kundeinfo",
@@ -384,29 +385,27 @@ export default function KickstartWizard() {
         {/* Steg 4: Designretning */}
         {step === 4 && (
           <Field label="Designretning (2026)" error={errors.design_direction?.message}>
-            <div className="grid grid-cols-1 gap-3">
-              {DESIGN_DIRECTIONS.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => setValue("design_direction", d.id)}
-                  className={`text-left px-4 py-3 rounded-xl border transition-all
-                    ${values.design_direction === d.id
-                      ? "border-blue-600 bg-blue-50 ring-1 ring-blue-600"
-                      : "border-gray-200 hover:border-gray-300"}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className={`text-sm font-semibold ${values.design_direction === d.id ? "text-blue-700" : "text-gray-900"}`}>
+            <div className="grid grid-cols-2 gap-3">
+              {DESIGN_DIRECTIONS.map((d) => {
+                const sel = values.design_direction === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setValue("design_direction", d.id)}
+                    className={`text-left rounded-xl border overflow-hidden transition-all
+                      ${sel ? "border-blue-600 ring-2 ring-blue-600" : "border-gray-200 hover:border-gray-300"}`}
+                  >
+                    <DesignDirectionPreview id={d.id} selected={sel} />
+                    <div className="px-3 py-2">
+                      <p className={`text-xs font-semibold leading-tight ${sel ? "text-blue-700" : "text-gray-900"}`}>
                         {d.label}
                       </p>
-                      <p className="text-xs text-gray-500 mt-0.5">{d.description}</p>
-                      <p className="text-xs text-gray-400 mt-1 font-mono">{d.signature}</p>
+                      <p className="text-xs text-gray-400 mt-0.5 leading-snug line-clamp-2">{d.suitedFor}</p>
                     </div>
-                    <span className="text-xs text-gray-400 whitespace-nowrap shrink-0 mt-0.5">{d.suitedFor}</span>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </Field>
         )}

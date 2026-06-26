@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { KickstartProject, PriceEstimate, BootstrapResult } from "@/lib/kickstart/types";
+import { KickstartProject, PriceEstimate, BootstrapResult, VerifyCheck } from "@/lib/kickstart/types";
 
 export default function ProjectDetailClient({ project: initial }: { project: KickstartProject }) {
   const [project, setProject] = useState(initial);
@@ -9,6 +9,7 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
   const [genLog, setGenLog] = useState<string[]>([]);
   const [liveText, setLiveText] = useState("");
   const [currentPartTitle, setCurrentPartTitle] = useState("");
+  const [verifyChecks, setVerifyChecks] = useState<VerifyCheck[] | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(false);
   const [bootLog, setBootLog] = useState<string[]>([]);
@@ -29,8 +30,9 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
     setGenLog(["Starter generering..."]);
     setLiveText("");
     setCurrentPartTitle("");
+    setVerifyChecks(null);
 
-    let localProjectId: string | null = null;
+    let localProjectId: string | null = project.id;
 
     async function readStream(fetchBody: object): Promise<"done" | "continue" | "error"> {
       let res: Response;
@@ -89,6 +91,17 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
             localProjectId = event.project_id as string;
             setGenLog((p) => [...p, "Del 1 lagret ✓ — starter Del 2 av 2..."]);
             return "continue";
+          } else if (event.type === "verify") {
+            const e = event as { ok: boolean; checks: VerifyCheck[] };
+            setVerifyChecks(e.checks);
+            const failed = e.checks.filter(c => !c.ok);
+            if (failed.length) {
+              setGenLog((p) => [...p, `⚠️ Verifisering: ${failed.map(c => c.label).join(", ")} mangler`]);
+            } else {
+              setGenLog((p) => [...p, "✓ Verifisering: alt innhold bekreftet"]);
+            }
+          } else if ((event as { type: string }).type === "github_updated") {
+            setGenLog((p) => [...p, `✓ GitHub oppdatert`]);
           } else if (event.type === "done") {
             setProject((p) => ({ ...p, project_md: (event as { project_md: string }).project_md, status: "generated" }));
             setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
@@ -105,28 +118,8 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
     }
 
     try {
-      const result1 = await readStream({
-        client_name:       project.client_name,
-        project_name:      project.project_name,
-        contact_person:    project.contact_person ?? "",
-        new_domain:        project.new_domain ?? "",
-        existing_url:      project.existing_url ?? "",
-        project_type:      project.project_type,
-        auth_type:         project.auth_type ?? "supabase-auth",
-        sprint_estimate:   project.sprint_estimate ?? 6,
-        requires_scrape:   project.requires_scrape ?? false,
-        tech_stack:        project.tech_stack ?? [],
-        integrations:      project.integrations ?? [],
-        design_direction:  project.design_direction ?? "",
-        primary_color:     project.primary_color ?? "#3B82F6",
-        secondary_color:   project.secondary_color ?? "",
-        motion_preference: project.motion_preference ?? "subtil",
-        features:          project.features ?? "",
-        extra_notes:       project.extra_notes ?? "",
-        short_description: project.short_description ?? "",
-        long_description:  project.long_description ?? "",
-      });
-
+      // Send eksisterende project_id + regenerate:true — oppdaterer samme prosjekt
+      const result1 = await readStream({ project_id: project.id, regenerate: true });
       if (result1 === "continue" && localProjectId) {
         await readStream({ project_id: localProjectId });
       }
@@ -271,6 +264,16 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
             >
               {liveText}
             </pre>
+          )}
+          {verifyChecks && (
+            <div className="border-t border-gray-800 px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-1">
+              {verifyChecks.map((c, i) => (
+                <div key={i} className={`flex items-center gap-1.5 text-xs font-mono ${c.ok ? "text-green-400" : "text-red-400"}`}>
+                  <span>{c.ok ? "✓" : "✗"}</span>
+                  <span>{c.label}</span>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

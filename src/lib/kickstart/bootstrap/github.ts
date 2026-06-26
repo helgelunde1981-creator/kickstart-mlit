@@ -45,6 +45,15 @@ export async function createGitHubRepo(
   return repo.html_url;
 }
 
+export async function updateProjectMdInGitHub(repoUrl: string, projectMd: string): Promise<void> {
+  const token = process.env.BOOTSTRAP_GITHUB_TOKEN;
+  if (!token) return;
+  const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+  if (!match) return;
+  const [, owner, repo] = match;
+  await addFileToRepo(token, owner, repo.replace(/\.git$/, ""), "PROJECT.md", projectMd);
+}
+
 async function addFileToRepo(
   token: string,
   owner: string,

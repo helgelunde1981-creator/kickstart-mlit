@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import { streamPart } from "@/lib/kickstart/generate";
 import { createProject, updateProjectMd, savePartialMd, getProject } from "@/lib/kickstart/queries";
-import { WizardFormData, KickstartProject } from "@/lib/kickstart/types";
+import { updateProjectMdInGitHub } from "@/lib/kickstart/bootstrap/github";
+import { WizardFormData, KickstartProject, VerifyCheck } from "@/lib/kickstart/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// SSE padding — Cloudflare buffers small chunks; >1KB initial comment forces flush
 const CF_FLUSH_PADDING = ": " + "x".repeat(1024) + "\n\n";
 
 function toFormData(p: KickstartProject): WizardFormData {
@@ -33,10 +33,29 @@ function toFormData(p: KickstartProject): WizardFormData {
   };
 }
 
+function verifyContent(md: string): { ok: boolean; checks: VerifyCheck[] } {
+  const checks: VerifyCheck[] = [
+    { label: "Del 1 fullført (>10 000 tegn)",    ok: md.length > 10_000 },
+    { label: "Del 2 separator (---)",             ok: md.includes("\n\n---\n\n") },
+    { label: "Sprintplan",                        ok: /sprintplan/i.test(md) },
+    { label: "SQL / datamodell",                  ok: /CREATE TABLE|datamodell|SQL/i.test(md) },
+    { label: "SEO / AEO",                         ok: /SEO|AEO|JSON-LD/i.test(md) },
+    { label: "AGENTS\.md",                        ok: /AGENTS\.md/i.test(md) },
+    { label: "Pre-launch sjekkliste",             ok: /pre-launch|prelaunch/i.test(md) },
+  ];
+  return { ok: checks.every(c => c.ok), checks };
+}
+
 export async function POST(req: NextRequest) {
-  const body: WizardFormData & { project_id?: string } = await req.json();
-  // Del 2: har project_id men ikke client_name (form-data)
-  const isPart2 = !!body.project_id && !body.client_name;
+  const body: WizardFormData & { project_id?: string; regenerate?: boolean } = await req.json();
+
+  // Tre moduser:
+  // 1. Nytt prosjekt Del 1: ingen project_id
+  // 2. Regenerer Del 1: project_id + regenerate: true
+  // 3. Del 2: project_id uten regenerate
+  const isNewPart1  = !body.project_id;
+  const isRegenPart1 = !!body.project_id && body.regenerate === true;
+  const isPart2      = !!body.project_id && !body.regenerate;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -48,7 +67,7 @@ export async function POST(req: NextRequest) {
 
       try {
         if (isPart2) {
-          // === DEL 2 — fortsettelse av eksisterende prosjekt ===
+          // === DEL 2 ===
           const project = await getProject(body.project_id!);
           if (!project) throw new Error(`Prosjekt ${body.project_id} ikke funnet`);
           const formData = toFormData(project);
@@ -70,13 +89,54 @@ export async function POST(req: NextRequest) {
 
           const fullMd = part1Content + "\n\n---\n\n" + part2Content;
           await updateProjectMd(project.id, fullMd);
-          console.log(`[stream] Del 2 ferdig og lagret — total ${fullMd.length} tegn`);
+          console.log(`[stream] Del 2 lagret — total ${fullMd.length} tegn`);
+
+          // Verifiser innholdet
+          const verify = verifyContent(fullMd);
+          console.log(`[stream] Verifisering: ${verify.ok ? "OK" : "FEIL"} — ${verify.checks.filter(c => !c.ok).map(c => c.label).join(", ") || "alt OK"}`);
+          send({ type: "verify", ok: verify.ok, checks: verify.checks });
+
+          // Push til GitHub hvis prosjektet har repo
+          if (project.github_repo_url) {
+            try {
+              await updateProjectMdInGitHub(project.github_repo_url, fullMd);
+              console.log(`[stream] GitHub oppdatert: ${project.github_repo_url}`);
+              send({ type: "github_updated", url: project.github_repo_url });
+            } catch (e) {
+              console.error(`[stream] GitHub-push feilet: ${(e as Error).message}`);
+            }
+          }
+
           send({ type: "done", project_md: fullMd });
 
-        } else {
-          // === DEL 1 — nytt prosjekt ===
+        } else if (isRegenPart1) {
+          // === REGENERER DEL 1 (eksisterende prosjekt) ===
+          const project = await getProject(body.project_id!);
+          if (!project) throw new Error(`Prosjekt ${body.project_id} ikke funnet`);
+          const formData = toFormData(project);
+          console.log(`[stream] Regen Del 1 start — id=${project.id}`);
+
+          heartbeat = setInterval(() => enqueue(": heartbeat\n\n"), 10_000);
+
+          let part1Content = "";
+          for await (const event of streamPart(formData, 0, "")) {
+            if (event.type === "start_part") {
+              send({ type: "start_part", part: event.part, title: event.title });
+            } else if (event.type === "delta") {
+              send({ type: "delta", text: event.text });
+            } else if (event.type === "part") {
+              part1Content = event.content;
+            }
+          }
+
+          await savePartialMd(project.id, part1Content);
+          console.log(`[stream] Regen Del 1 lagret — ${part1Content.length} tegn`);
+          send({ type: "continue", project_id: project.id });
+
+        } else if (isNewPart1) {
+          // === NYTT PROSJEKT DEL 1 ===
           const formData = body as WizardFormData;
-          console.log(`[stream] Del 1 start — klient="${formData.client_name}" tech=${formData.tech_stack?.length} integrations=${formData.integrations?.length ?? "undefined"}`);
+          console.log(`[stream] Nytt prosjekt Del 1 — klient="${formData.client_name}"`);
           const project = await createProject(formData);
           console.log(`[stream] Prosjekt opprettet id=${project.id}`);
           send({ type: "project_id", id: project.id });
@@ -94,9 +154,8 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Lagre Del 1 med en gang — Del 2 starter i ny request
           await savePartialMd(project.id, part1Content);
-          console.log(`[stream] Del 1 ferdig og lagret — ${part1Content.length} tegn`);
+          console.log(`[stream] Del 1 lagret — ${part1Content.length} tegn`);
           send({ type: "continue", project_id: project.id });
         }
 

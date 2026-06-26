@@ -99,11 +99,14 @@ export interface BootstrapResult {
   errors: string[];
 }
 
+export type VerifyCheck = { label: string; ok: boolean };
+
 export type StreamEvent =
   | { type: "start_part"; part: number; title: string }
   | { type: "delta"; text: string }
   | { type: "part"; part: number; title: string; content: string }
   | { type: "continue"; project_id: string }
+  | { type: "verify"; ok: boolean; checks: VerifyCheck[] }
   | { type: "done"; project_md: string }
   | { type: "error"; message: string };
 

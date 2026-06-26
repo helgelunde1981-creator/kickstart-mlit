@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -145,7 +145,10 @@ export default function KickstartWizard() {
             } else if (event.type === "part") {
               setGenLog((p) => {
                 const next = [...p];
-                const idx = next.findLastIndex((l) => l.startsWith("Genererer:"));
+                let idx = -1;
+                for (let j = next.length - 1; j >= 0; j--) {
+                  if (next[j].startsWith("Genererer:")) { idx = j; break; }
+                }
                 if (idx !== -1) next[idx] = `✓ ${event.title as string}`;
                 return next;
               });
@@ -547,7 +550,7 @@ function inp() {
   return "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
@@ -557,7 +560,7 @@ function Field({ label, error, children }: { label: string; error?: string; chil
   );
 }
 
-function Row2({ children }: { children: React.ReactNode }) {
+function Row2({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-2 gap-4">{children}</div>;
 }
 

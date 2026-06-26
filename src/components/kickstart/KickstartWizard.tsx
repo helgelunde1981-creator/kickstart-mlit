@@ -104,71 +104,87 @@ export default function KickstartWizard() {
     setCurrentPartTitle("");
 
     let gotError = false;
-    try {
-      const res = await fetch("/api/kickstart/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(getValues()),
-      });
+    let localProjectId: string | null = null;
 
+    async function readStream(fetchBody: object): Promise<"done" | "continue" | "error"> {
+      let res: Response;
+      try {
+        res = await fetch("/api/kickstart/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fetchBody),
+        });
+      } catch (e) {
+        setGenLog((p) => [...p, `Nettverksfeil: ${(e as Error).message}`]);
+        return "error";
+      }
       if (!res.ok || !res.body) {
         setGenLog((p) => [...p, `Serverfeil: ${res.status} ${res.statusText}`]);
-        gotError = true;
-      } else {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+        return "error";
+      }
 
-        while (true) {
-          const { done: rdone, value } = await reader.read();
-          if (rdone) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-          for (const line of lines) {
-            if (!line.startsWith("data:")) continue;
-            let event: Record<string, unknown>;
-            try {
-              event = JSON.parse(line.slice(5).trim());
-            } catch {
-              continue;
-            }
+      while (true) {
+        const { done: rdone, value } = await reader.read();
+        if (rdone) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
 
-            if (event.type === "project_id") {
-              setCreatedId(event.id as string);
-            } else if (event.type === "start_part") {
-              setCurrentPartTitle(event.title as string);
-              setLiveText("");
-              setGenLog((p) => [...p, `Genererer: ${event.title as string}`]);
-            } else if (event.type === "delta") {
-              setLiveText((p) => p + (event.text as string));
-            } else if (event.type === "part") {
-              setGenLog((p) => {
-                const next = [...p];
-                let idx = -1;
-                for (let j = next.length - 1; j >= 0; j--) {
-                  if (next[j].startsWith("Genererer:")) { idx = j; break; }
-                }
-                if (idx !== -1) next[idx] = `✓ ${event.title as string}`;
-                return next;
-              });
-              setLiveText("");
-              setCurrentPartTitle("");
-            } else if (event.type === "done") {
-              setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
-              setLiveText("");
-              setCurrentPartTitle("");
-              setDone(true);
-            } else if (event.type === "error") {
-              setGenLog((p) => [...p, `Feil: ${event.message as string}`]);
-              gotError = true;
-            }
+        for (const line of lines) {
+          if (!line.startsWith("data:")) continue;
+          let event: Record<string, unknown>;
+          try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
+
+          if (event.type === "project_id") {
+            localProjectId = event.id as string;
+            setCreatedId(event.id as string);
+          } else if (event.type === "start_part") {
+            setCurrentPartTitle(event.title as string);
+            setLiveText("");
+            setGenLog((p) => [...p, `Genererer: ${event.title as string}`]);
+          } else if (event.type === "delta") {
+            setLiveText((p) => p + (event.text as string));
+          } else if (event.type === "part") {
+            setGenLog((p) => {
+              const next = [...p];
+              let idx = -1;
+              for (let j = next.length - 1; j >= 0; j--) {
+                if (next[j].startsWith("Genererer:")) { idx = j; break; }
+              }
+              if (idx !== -1) next[idx] = `✓ ${event.title as string}`;
+              return next;
+            });
+            setLiveText("");
+            setCurrentPartTitle("");
+          } else if (event.type === "continue") {
+            localProjectId = event.project_id as string;
+            setCreatedId(event.project_id as string);
+            setGenLog((p) => [...p, "Del 1 lagret ✓ — starter Del 2 av 2..."]);
+            return "continue";
+          } else if (event.type === "done") {
+            setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
+            setLiveText("");
+            setCurrentPartTitle("");
+            setDone(true);
+            return "done";
+          } else if (event.type === "error") {
+            setGenLog((p) => [...p, `Feil: ${event.message as string}`]);
+            return "error";
           }
         }
       }
-    } catch (e) {
-      setGenLog((p) => [...p, `Nettverksfeil: ${(e as Error).message}`]);
+      return "done";
+    }
+
+    const result1 = await readStream(getValues());
+    if (result1 === "continue" && localProjectId) {
+      const result2 = await readStream({ project_id: localProjectId });
+      if (result2 === "error") gotError = true;
+    } else if (result1 === "error") {
       gotError = true;
     }
 

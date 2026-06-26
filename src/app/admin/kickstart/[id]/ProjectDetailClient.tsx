@@ -30,36 +30,23 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
     setLiveText("");
     setCurrentPartTitle("");
 
-    try {
-      const res = await fetch("/api/kickstart/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_name:       project.client_name,
-          project_name:      project.project_name,
-          contact_person:    project.contact_person ?? "",
-          new_domain:        project.new_domain ?? "",
-          existing_url:      project.existing_url ?? "",
-          project_type:      project.project_type,
-          auth_type:         project.auth_type ?? "supabase-auth",
-          sprint_estimate:   project.sprint_estimate ?? 6,
-          requires_scrape:   project.requires_scrape ?? false,
-          tech_stack:        project.tech_stack ?? [],
-          integrations:      project.integrations ?? [],
-          design_direction:  project.design_direction ?? "",
-          primary_color:     project.primary_color ?? "#3B82F6",
-          secondary_color:   project.secondary_color ?? "",
-          motion_preference: project.motion_preference ?? "subtil",
-          features:          project.features ?? "",
-          extra_notes:       project.extra_notes ?? "",
-          short_description: project.short_description ?? "",
-          long_description:  project.long_description ?? "",
-        }),
-      });
+    let localProjectId: string | null = null;
 
+    async function readStream(fetchBody: object): Promise<"done" | "continue" | "error"> {
+      let res: Response;
+      try {
+        res = await fetch("/api/kickstart/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(fetchBody),
+        });
+      } catch (e) {
+        setGenLog((p) => [...p, `❌ Nettverksfeil: ${(e as Error).message}`]);
+        return "error";
+      }
       if (!res.ok || !res.body) {
         setGenLog((p) => [...p, `❌ Serverfeil: ${res.status}`]);
-        return;
+        return "error";
       }
 
       const reader = res.body.getReader();
@@ -78,7 +65,9 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
           let event: Record<string, unknown>;
           try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
 
-          if (event.type === "start_part") {
+          if (event.type === "project_id") {
+            localProjectId = event.id as string;
+          } else if (event.type === "start_part") {
             setCurrentPartTitle(event.title as string);
             setLiveText("");
             setGenLog((p) => [...p, `Genererer: ${event.title as string}`]);
@@ -96,18 +85,51 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
             });
             setLiveText("");
             setCurrentPartTitle("");
+          } else if (event.type === "continue") {
+            localProjectId = event.project_id as string;
+            setGenLog((p) => [...p, "Del 1 lagret ✓ — starter Del 2 av 2..."]);
+            return "continue";
           } else if (event.type === "done") {
             setProject((p) => ({ ...p, project_md: (event as { project_md: string }).project_md, status: "generated" }));
             setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
             setLiveText("");
             setCurrentPartTitle("");
+            return "done";
           } else if (event.type === "error") {
             setGenLog((p) => [...p, `❌ ${event.message as string}`]);
+            return "error";
           }
         }
       }
-    } catch (e) {
-      setGenLog((p) => [...p, `❌ Nettverksfeil: ${(e as Error).message}`]);
+      return "done";
+    }
+
+    try {
+      const result1 = await readStream({
+        client_name:       project.client_name,
+        project_name:      project.project_name,
+        contact_person:    project.contact_person ?? "",
+        new_domain:        project.new_domain ?? "",
+        existing_url:      project.existing_url ?? "",
+        project_type:      project.project_type,
+        auth_type:         project.auth_type ?? "supabase-auth",
+        sprint_estimate:   project.sprint_estimate ?? 6,
+        requires_scrape:   project.requires_scrape ?? false,
+        tech_stack:        project.tech_stack ?? [],
+        integrations:      project.integrations ?? [],
+        design_direction:  project.design_direction ?? "",
+        primary_color:     project.primary_color ?? "#3B82F6",
+        secondary_color:   project.secondary_color ?? "",
+        motion_preference: project.motion_preference ?? "subtil",
+        features:          project.features ?? "",
+        extra_notes:       project.extra_notes ?? "",
+        short_description: project.short_description ?? "",
+        long_description:  project.long_description ?? "",
+      });
+
+      if (result1 === "continue" && localProjectId) {
+        await readStream({ project_id: localProjectId });
+      }
     } finally {
       setGenerating(false);
     }

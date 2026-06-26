@@ -103,6 +103,7 @@ export type StreamEvent =
   | { type: "start_part"; part: number; title: string }
   | { type: "delta"; text: string }
   | { type: "part"; part: number; title: string; content: string }
+  | { type: "continue"; project_id: string }
   | { type: "done"; project_md: string }
   | { type: "error"; message: string };
 

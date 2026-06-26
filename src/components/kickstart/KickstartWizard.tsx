@@ -105,6 +105,7 @@ export default function KickstartWizard() {
 
     let gotError = false;
     let localProjectId: string | null = null;
+    let localNextPart = 2;
 
     async function readStream(fetchBody: object): Promise<"done" | "continue" | "error"> {
       let res: Response;
@@ -162,8 +163,10 @@ export default function KickstartWizard() {
             setCurrentPartTitle("");
           } else if (event.type === "continue") {
             localProjectId = event.project_id as string;
+            localNextPart = (event.next_part as number) ?? 2;
             setCreatedId(event.project_id as string);
-            setGenLog((p) => [...p, "Del 1 lagret ✓ — starter Del 2 av 2..."]);
+            const nextPart = event.next_part as number;
+            setGenLog((p) => [...p, `Del ${nextPart - 1} lagret ✓ — starter Del ${nextPart}...`]);
             return "continue";
           } else if (event.type === "done") {
             setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
@@ -180,13 +183,11 @@ export default function KickstartWizard() {
       return "done";
     }
 
-    const result1 = await readStream(getValues());
-    if (result1 === "continue" && localProjectId) {
-      const result2 = await readStream({ project_id: localProjectId });
-      if (result2 === "error") gotError = true;
-    } else if (result1 === "error") {
-      gotError = true;
+    let result = await readStream(getValues());
+    while (result === "continue" && localProjectId) {
+      result = await readStream({ project_id: localProjectId, part: localNextPart });
     }
+    if (result === "error") gotError = true;
 
     if (!gotError) setSubmitting(false);
   }

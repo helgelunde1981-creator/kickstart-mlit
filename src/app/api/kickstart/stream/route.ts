@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { streamPart } from "@/lib/kickstart/generate";
+import { streamPart, TOTAL_PARTS } from "@/lib/kickstart/generate";
 import { createProject, updateProjectMd, savePartialMd, getProject } from "@/lib/kickstart/queries";
 import { updateProjectMdInGitHub } from "@/lib/kickstart/bootstrap/github";
 import { WizardFormData, KickstartProject, VerifyCheck } from "@/lib/kickstart/types";
@@ -47,15 +47,15 @@ function verifyContent(md: string): { ok: boolean; checks: VerifyCheck[] } {
 }
 
 export async function POST(req: NextRequest) {
-  const body: WizardFormData & { project_id?: string; regenerate?: boolean } = await req.json();
+  const body: WizardFormData & { project_id?: string; regenerate?: boolean; part?: number } = await req.json();
 
   // Tre moduser:
   // 1. Nytt prosjekt Del 1: ingen project_id
   // 2. Regenerer Del 1: project_id + regenerate: true
-  // 3. Del 2: project_id uten regenerate
-  const isNewPart1  = !body.project_id;
+  // 3. Fortsettelse Del N: project_id + part (2..TOTAL_PARTS)
+  const isNewPart1   = !body.project_id;
   const isRegenPart1 = !!body.project_id && body.regenerate === true;
-  const isPart2      = !!body.project_id && !body.regenerate;
+  const isContinuation = !!body.project_id && !body.regenerate;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -66,48 +66,58 @@ export async function POST(req: NextRequest) {
       let heartbeat: ReturnType<typeof setInterval> | null = null;
 
       try {
-        if (isPart2) {
-          // === DEL 2 ===
+        if (isContinuation) {
+          // === FORTSETTELSE DEL N (2..TOTAL_PARTS) ===
+          const partIndex = (body.part ?? 2) - 1; // 0-indeksert
+          const isLastPart = partIndex === TOTAL_PARTS - 1;
+
           const project = await getProject(body.project_id!);
           if (!project) throw new Error(`Prosjekt ${body.project_id} ikke funnet`);
           const formData = toFormData(project);
-          const part1Content = project.project_md ?? "";
-          console.log(`[stream] Del 2 start — id=${project.id} part1=${part1Content.length} tegn`);
+          const previousContent = project.project_md ?? "";
+          console.log(`[stream] Del ${partIndex + 1}/${TOTAL_PARTS} start — id=${project.id} akkumulert=${previousContent.length} tegn`);
 
           heartbeat = setInterval(() => enqueue(": heartbeat\n\n"), 10_000);
 
-          let part2Content = "";
-          for await (const event of streamPart(formData, 1, part1Content)) {
+          let newPartContent = "";
+          for await (const event of streamPart(formData, partIndex, previousContent)) {
             if (event.type === "start_part") {
               send({ type: "start_part", part: event.part, title: event.title });
             } else if (event.type === "delta") {
               send({ type: "delta", text: event.text });
             } else if (event.type === "part") {
-              part2Content = event.content;
+              newPartContent = event.content;
             }
           }
 
-          const fullMd = part1Content + "\n\n---\n\n" + part2Content;
-          await updateProjectMd(project.id, fullMd);
-          console.log(`[stream] Del 2 lagret — total ${fullMd.length} tegn`);
+          const combined = previousContent + "\n\n---\n\n" + newPartContent;
 
-          // Verifiser innholdet
-          const verify = verifyContent(fullMd);
-          console.log(`[stream] Verifisering: ${verify.ok ? "OK" : "FEIL"} — ${verify.checks.filter(c => !c.ok).map(c => c.label).join(", ") || "alt OK"}`);
-          send({ type: "verify", ok: verify.ok, checks: verify.checks });
+          if (isLastPart) {
+            // Siste del: lagre ferdig, verifiser, push til GitHub
+            await updateProjectMd(project.id, combined);
+            console.log(`[stream] Del ${partIndex + 1}/${TOTAL_PARTS} (SISTE) lagret — total ${combined.length} tegn`);
 
-          // Push til GitHub hvis prosjektet har repo
-          if (project.github_repo_url) {
-            try {
-              await updateProjectMdInGitHub(project.github_repo_url, fullMd);
-              console.log(`[stream] GitHub oppdatert: ${project.github_repo_url}`);
-              send({ type: "github_updated", url: project.github_repo_url });
-            } catch (e) {
-              console.error(`[stream] GitHub-push feilet: ${(e as Error).message}`);
+            const verify = verifyContent(combined);
+            console.log(`[stream] Verifisering: ${verify.ok ? "OK" : "FEIL"} — ${verify.checks.filter(c => !c.ok).map(c => c.label).join(", ") || "alt OK"}`);
+            send({ type: "verify", ok: verify.ok, checks: verify.checks });
+
+            if (project.github_repo_url) {
+              try {
+                await updateProjectMdInGitHub(project.github_repo_url, combined);
+                console.log(`[stream] GitHub oppdatert: ${project.github_repo_url}`);
+                send({ type: "github_updated", url: project.github_repo_url } as object);
+              } catch (e) {
+                console.error(`[stream] GitHub-push feilet: ${(e as Error).message}`);
+              }
             }
-          }
 
-          send({ type: "done", project_md: fullMd });
+            send({ type: "done", project_md: combined });
+          } else {
+            // Mellomliggende del: lagre delvis, start neste
+            await savePartialMd(project.id, combined);
+            console.log(`[stream] Del ${partIndex + 1}/${TOTAL_PARTS} lagret — ${combined.length} tegn, starter del ${partIndex + 2}`);
+            send({ type: "continue", project_id: project.id, next_part: partIndex + 2 });
+          }
 
         } else if (isRegenPart1) {
           // === REGENERER DEL 1 (eksisterende prosjekt) ===
@@ -131,7 +141,7 @@ export async function POST(req: NextRequest) {
 
           await savePartialMd(project.id, part1Content);
           console.log(`[stream] Regen Del 1 lagret — ${part1Content.length} tegn`);
-          send({ type: "continue", project_id: project.id });
+          send({ type: "continue", project_id: project.id, next_part: 2 });
 
         } else if (isNewPart1) {
           // === NYTT PROSJEKT DEL 1 ===
@@ -156,7 +166,7 @@ export async function POST(req: NextRequest) {
 
           await savePartialMd(project.id, part1Content);
           console.log(`[stream] Del 1 lagret — ${part1Content.length} tegn`);
-          send({ type: "continue", project_id: project.id });
+          send({ type: "continue", project_id: project.id, next_part: 2 });
         }
 
       } catch (e) {

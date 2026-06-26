@@ -33,6 +33,7 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
     setVerifyChecks(null);
 
     let localProjectId: string | null = project.id;
+    let localNextPart = 2;
 
     async function readStream(fetchBody: object): Promise<"done" | "continue" | "error"> {
       let res: Response;
@@ -89,7 +90,9 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
             setCurrentPartTitle("");
           } else if (event.type === "continue") {
             localProjectId = event.project_id as string;
-            setGenLog((p) => [...p, "Del 1 lagret ✓ — starter Del 2 av 2..."]);
+            localNextPart = (event.next_part as number) ?? 2;
+            const nextPart = event.next_part as number;
+            setGenLog((p) => [...p, `Del ${nextPart - 1} lagret ✓ — starter Del ${nextPart}...`]);
             return "continue";
           } else if (event.type === "verify") {
             const e = event as { ok: boolean; checks: VerifyCheck[] };
@@ -119,9 +122,9 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
 
     try {
       // Send eksisterende project_id + regenerate:true — oppdaterer samme prosjekt
-      const result1 = await readStream({ project_id: project.id, regenerate: true });
-      if (result1 === "continue" && localProjectId) {
-        await readStream({ project_id: localProjectId });
+      let result = await readStream({ project_id: project.id, regenerate: true });
+      while (result === "continue" && localProjectId) {
+        result = await readStream({ project_id: localProjectId, part: localNextPart });
       }
     } finally {
       setGenerating(false);

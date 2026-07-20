@@ -2,9 +2,11 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { KickstartProject, PriceEstimate, BootstrapResult, VerifyCheck } from "@/lib/kickstart/types";
+import ProjectEditForm from "@/components/kickstart/ProjectEditForm";
 
 export default function ProjectDetailClient({ project: initial }: { project: KickstartProject }) {
   const [project, setProject] = useState(initial);
+  const [editing, setEditing] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genLog, setGenLog] = useState<string[]>([]);
   const [liveText, setLiveText] = useState("");
@@ -198,15 +200,38 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
 
   const hasFailed = genLog.some((l) => l.startsWith("❌"));
 
+  if (editing) {
+    return (
+      <div className="space-y-6">
+        <ProjectEditForm
+          project={project}
+          onCancel={() => setEditing(false)}
+          onSaved={(fields) => {
+            setProject((p) => ({ ...p, ...fields }));
+            setEditing(false);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <dl className="grid grid-cols-2 gap-4 text-sm">
-          <Info label="Type" value={project.project_type} />
-          <Info label="Teknologier" value={project.tech_stack.join(", ")} />
-          <Info label="Farge" value={project.primary_color ?? "–"} color={project.primary_color} />
-          <Info label="Status" value={project.status} />
-        </dl>
+        <div className="flex items-start justify-between gap-3">
+          <dl className="grid grid-cols-2 gap-4 text-sm flex-1">
+            <Info label="Type" value={project.project_type} />
+            <Info label="Teknologier" value={project.tech_stack.join(", ") || "Standard-stack (ingen ekstra valgt)"} />
+            <Info label="Farge" value={project.primary_color ?? "–"} color={project.primary_color} />
+            <Info label="Status" value={project.status} />
+          </dl>
+          <button
+            onClick={() => setEditing(true)}
+            className="shrink-0 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-200"
+          >
+            Rediger
+          </button>
+        </div>
         {project.short_description && (
           <p className="mt-3 text-sm text-gray-600">{project.short_description}</p>
         )}

@@ -68,6 +68,24 @@ export async function savePartialMd(id: string, project_md: string): Promise<voi
   if (error) console.error(`[queries] savePartialMd feil: ${error.message}`);
 }
 
+export interface ProjectEditableFields {
+  tech_stack?: string[];
+  integrations?: string[];
+  design_direction?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  motion_preference?: string;
+  auth_type?: string;
+}
+
+export async function updateProjectFields(id: string, fields: ProjectEditableFields): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("kickstart_projects")
+    .update(fields)
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function updateProjectEstimate(id: string, price_estimate: object): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("kickstart_projects")

@@ -10,23 +10,26 @@ const PRESETS = [
 interface Props {
   value: string;
   onChange: (v: string) => void;
+  label?: string;
+  loadPriorColors?: boolean;
 }
 
-export default function ColorPicker({ value, onChange }: Props) {
+export default function ColorPicker({ value, onChange, label = "Primærfarge", loadPriorColors = true }: Props) {
   const [priorColors, setPriorColors] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!loadPriorColors) return;
     fetch("/api/kickstart/prior-colors")
       .then((r) => r.json())
       .then((colors: string[]) => setPriorColors(colors))
       .catch(() => {});
-  }, []);
+  }, [loadPriorColors]);
 
   const allColors = [...new Set([...priorColors, ...PRESETS])];
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-3">Primærfarge</label>
+      <label className="block text-sm font-medium text-gray-700 mb-3">{label}</label>
 
       <div className="flex flex-wrap gap-2 mb-4">
         {allColors.map((c) => (

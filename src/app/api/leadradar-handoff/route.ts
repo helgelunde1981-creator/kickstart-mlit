@@ -16,7 +16,10 @@ import { WizardFormData } from "@/lib/kickstart/types";
 // resonnement som /api/kickstart/stream — hele 12-dels-generingen ville vært
 // for lang til ett enkelt kall.
 export const runtime = "nodejs";
-export const maxDuration = 120;
+// Del 1 alene kan ta over 120s (bekreftet via FUNCTION_INVOCATION_TIMEOUT i
+// live-test 2026-07-20) — matcher derfor /api/kickstart/stream sin egen
+// grense fremfor å anta et lavere tall holder.
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("authorization");

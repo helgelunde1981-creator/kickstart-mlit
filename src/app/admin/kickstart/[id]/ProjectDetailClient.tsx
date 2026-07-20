@@ -16,6 +16,11 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
   const [bootstrapping, setBootstrapping] = useState(false);
   const [bootLog, setBootLog] = useState<string[]>([]);
   const [estimate, setEstimate] = useState<PriceEstimate | null>(initial.price_estimate);
+  const [mockupImages, setMockupImages] = useState<string[]>(initial.mockup_images ?? []);
+  const [mockupCount, setMockupCount] = useState(6);
+  const [generatingMockups, setGeneratingMockups] = useState(false);
+  const [mockupProgress, setMockupProgress] = useState<{ index: number; total: number } | null>(null);
+  const [mockupError, setMockupError] = useState<string | null>(null);
   const liveRef = useRef<HTMLPreElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -198,6 +203,55 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
     setBootstrapping(false);
   }
 
+  async function generateMockups() {
+    setGeneratingMockups(true);
+    setMockupError(null);
+    setMockupProgress(null);
+    setMockupImages([]);
+
+    const res = await fetch("/api/kickstart/mockup-images", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: project.id, count: mockupCount }),
+    });
+
+    if (!res.body) {
+      setMockupError(`Serverfeil: ${res.status}`);
+      setGeneratingMockups(false);
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue;
+        const event = JSON.parse(line.slice(5).trim());
+        if (event.type === "progress") {
+          setMockupProgress({ index: event.index, total: event.total });
+        } else if (event.type === "image") {
+          setMockupImages((p) => [...p, event.dataUrl]);
+        } else if (event.type === "image_error") {
+          setMockupError((p) => (p ? `${p} · Bilde ${event.index}: ${event.message}` : `Bilde ${event.index}: ${event.message}`));
+        } else if (event.type === "done") {
+          setProject((p) => ({ ...p, mockup_images: event.images }));
+        } else if (event.type === "error") {
+          setMockupError(event.message);
+        }
+      }
+    }
+    setMockupProgress(null);
+    setGeneratingMockups(false);
+  }
+
   const hasFailed = genLog.some((l) => l.startsWith("❌"));
 
   if (editing) {
@@ -328,6 +382,53 @@ export default function ProjectDetailClient({ project: initial }: { project: Kic
             ))}
           </div>
           <p className="mt-3 text-xs text-gray-500">{estimate.notes}</p>
+        </div>
+      )}
+
+      {project.project_md && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h2 className="font-semibold text-gray-900 mb-1">Mockup-bilder</h2>
+          <p className="text-xs text-gray-500 mb-3">
+            {project.project_type === "mobile" ? "App-skjermer" : "Nettside-sider"} generert fra spec-en — for å sjekke at retningen er riktig før byggestart.
+          </p>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex gap-1.5">
+              {[4, 6, 8, 10].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setMockupCount(n)}
+                  disabled={generatingMockups}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border disabled:opacity-50
+                    ${mockupCount === n ? "border-blue-600 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={generateMockups}
+              disabled={generatingMockups}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {generatingMockups
+                ? `Genererer... ${mockupProgress ? `(${mockupProgress.index}/${mockupProgress.total})` : ""}`
+                : mockupImages.length > 0
+                  ? "Regenerer mockup-bilder"
+                  : "Generer mockup-bilder"}
+            </button>
+          </div>
+          {mockupError && <p className="text-sm text-red-500 mb-3">{mockupError}</p>}
+          {mockupImages.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {mockupImages.map((src, i) => (
+                <a key={i} href={src} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-gray-200 hover:border-gray-300">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- data: URL, ikke en optimaliserbar remote-URL */}
+                  <img src={src} alt={`Mockup ${i + 1}`} className="w-full h-auto" />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

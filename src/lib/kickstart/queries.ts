@@ -105,6 +105,14 @@ export async function updateProjectBootstrap(
   if (error) throw error;
 }
 
+export async function saveMockupImages(id: string, mockup_images: string[]): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("kickstart_projects")
+    .update({ mockup_images })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("kickstart_projects")

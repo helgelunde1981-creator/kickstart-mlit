@@ -30,6 +30,7 @@ export interface KickstartProject {
   supabase_project_ref: string | null;
   vercel_project_id: string | null;
   step_completed: number;
+  mockup_images: string[];
 }
 
 export interface PriceEstimate {

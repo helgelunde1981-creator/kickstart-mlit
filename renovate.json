@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Oslo",
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 3,
+  "postUpdateOptions": ["pnpmDedupe"],
+  "packageRules": [
+    {
+      "description": "Grupper minor/patch i devDependencies for å redusere PR-støy",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "dev-avhengigheter (minor/patch)"
+    },
+    {
+      "description": "Kjerne-rammeverk (Next.js/React), Supabase-klient og Anthropic SDK: major-oppdateringer holdes separate og tydelig merket, siden dette er selve wizard-motoren i kickstart-mlit",
+      "matchPackageNames": ["next", "react", "react-dom", "@supabase/supabase-js", "@anthropic-ai/sdk"],
+      "matchUpdateTypes": ["major"],
+      "groupName": "kjerne-rammeverk (major)",
+      "labels": ["major-oppdatering"]
+    }
+  ],
+  "lockFileMaintenance": {
+    "enabled": true
+  }
+}

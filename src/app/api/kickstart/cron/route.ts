@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { isTrustedWorkerRequest, isVercelCron } from "@/lib/kickstart/worker-auth";
+import { describeRejectedRequest, isTrustedWorkerRequest, isVercelCron } from "@/lib/kickstart/worker-auth";
 import { listQueuedJobs, recoverStaleJobs } from "@/lib/kickstart/jobs";
 import { triggerWorker } from "@/lib/kickstart/dispatch";
 import { productionDeps, runNextPart } from "@/lib/kickstart/worker";
@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
   // Enten vår egen hemmelighet, eller Vercels egen cron-header (som er det
   // eneste vi får når CRON_SECRET ikke er satt).
   if (!isTrustedWorkerRequest(req) && !isVercelCron(req)) {
+    console.warn(`[cron] Avviste kall — ${describeRejectedRequest(req)}`);
     return NextResponse.json({ error: "Ikke autorisert" }, { status: 401 });
   }
 

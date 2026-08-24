@@ -31,7 +31,25 @@ export function workerAuthHeader(): Record<string, string> {
  * opprette jobber eller lese data.
  */
 export function isVercelCron(request: Request): boolean {
-  return request.headers.get("x-vercel-cron") !== null;
+  if (request.headers.get("x-vercel-cron") !== null) return true;
+  // Det Vercel faktisk sender er en egen user-agent. Beholder begge: headeren
+  // koster ingenting, og user-agenten er den som er observert i praksis.
+  return /vercel-cron/i.test(request.headers.get("user-agent") ?? "");
+}
+
+/**
+ * Hva et avvist kall hadde med seg. Uten dette blir en 401 fra cron stående som
+ * et mysterium — det var nettopp slik den forrige gjetningen overlevde en
+ * deploy.
+ */
+export function describeRejectedRequest(request: Request): string {
+  const interessante = [...request.headers.keys()].filter(
+    (k) => k.startsWith("x-vercel") || k === "user-agent" || k === "authorization",
+  );
+  const beskrivelse = interessante.map((k) =>
+    k === "authorization" ? "authorization=<satt>" : `${k}=${request.headers.get(k)}`,
+  );
+  return beskrivelse.join(" ") || "ingen relevante headere";
 }
 
 /** Vercel Cron sender CRON_SECRET som bearer-token; worker-kall sender vår egen. */

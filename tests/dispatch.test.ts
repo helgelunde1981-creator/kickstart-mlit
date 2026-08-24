@@ -132,4 +132,27 @@ describe("cron-autentisering", () => {
     const vanligKall = new Request("https://kickstart.mlit.no/api/kickstart/cron");
     expect(isVercelCron(vanligKall)).toBe(false);
   });
+
+  it("godtar Vercels cron-user-agent — det er det som faktisk sendes", async () => {
+    const { isVercelCron } = await import("@/lib/kickstart/worker-auth");
+
+    const kall = new Request("https://kickstart.mlit.no/api/kickstart/cron", {
+      headers: { "user-agent": "vercel-cron/1.0" },
+    });
+    expect(isVercelCron(kall)).toBe(true);
+  });
+
+  it("beskriver avviste kall slik at en 401 kan feilsøkes", async () => {
+    const { describeRejectedRequest } = await import("@/lib/kickstart/worker-auth");
+
+    const kall = new Request("https://kickstart.mlit.no/api/kickstart/cron", {
+      headers: { "user-agent": "noe-ukjent/2.0", authorization: "Bearer hemmelig" },
+    });
+    const beskrivelse = describeRejectedRequest(kall);
+
+    expect(beskrivelse).toContain("user-agent=noe-ukjent/2.0");
+    // Verdien skal aldri havne i loggen.
+    expect(beskrivelse).toContain("authorization=<satt>");
+    expect(beskrivelse).not.toContain("hemmelig");
+  });
 });

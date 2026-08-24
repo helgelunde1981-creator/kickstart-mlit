@@ -91,6 +91,30 @@ describe("siteUrl", () => {
 
     process.env.NEXT_PUBLIC_SITE_URL = "https://kickstart.mlit.no";
   });
+
+  it("overser en NEXT_PUBLIC_SITE_URL som peker på localhost når forespørselen har et ekte domene", async () => {
+    // Dette sto i produksjon: variabelen var en rest fra lokal utvikling, og
+    // appen prøvde å kalle seg selv på localhost:3000.
+    process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
+    const { resolveSiteUrl } = await import("@/lib/kickstart/base-url");
+
+    const resultat = resolveSiteUrl({
+      headers: new Headers({ host: "kickstart.mlit.no", "x-forwarded-proto": "https" }),
+    });
+    expect(resultat).toEqual({ url: "https://kickstart.mlit.no", source: "request" });
+
+    process.env.NEXT_PUBLIC_SITE_URL = "https://kickstart.mlit.no";
+  });
+
+  it("beholder localhost-verdien når vi faktisk kjører lokalt", async () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "http://localhost:3000";
+    const { resolveSiteUrl } = await import("@/lib/kickstart/base-url");
+
+    const resultat = resolveSiteUrl({ headers: new Headers({ host: "localhost:3000" }) });
+    expect(resultat.url).toBe("http://localhost:3000");
+
+    process.env.NEXT_PUBLIC_SITE_URL = "https://kickstart.mlit.no";
+  });
 });
 
 describe("cron-autentisering", () => {

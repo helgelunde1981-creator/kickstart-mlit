@@ -1,4 +1,4 @@
-import { siteUrl } from "./base-url";
+import { resolveSiteUrl, siteUrl, UrlSource } from "./base-url";
 import { workerAuthHeader } from "./worker-auth";
 
 /**
@@ -61,8 +61,10 @@ export async function triggerWorker(jobId: string, origin?: string): Promise<boo
  */
 export async function probeSelfUrl(
   request?: { headers: Headers },
-): Promise<{ url: string; reachable: boolean; status: number | null; hint?: string }> {
-  const url = siteUrl(request);
+): Promise<{ url: string; source: UrlSource; reachable: boolean; status: number | null; hint?: string }> {
+  // Kilden tas med i svaret: står det «env» og URL-en er feil, vet man med én
+  // gang at det er NEXT_PUBLIC_SITE_URL som må ryddes, ikke koden.
+  const { url, source } = resolveSiteUrl(request);
   try {
     const res = await fetch(`${url}/login`, {
       method: "GET",
@@ -73,6 +75,7 @@ export async function probeSelfUrl(
     const reachable = res.ok;
     return {
       url,
+      source,
       reachable,
       status: res.status,
       ...(reachable
@@ -84,6 +87,6 @@ export async function probeSelfUrl(
           }),
     };
   } catch (e) {
-    return { url, reachable: false, status: null, hint: (e as Error).message };
+    return { url, source, reachable: false, status: null, hint: (e as Error).message };
   }
 }

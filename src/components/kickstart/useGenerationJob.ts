@@ -33,6 +33,8 @@ export interface GenerationJobState {
   /** Vi har bedt om start, men vet ennå ikke hva serveren gjorde. */
   starting: boolean;
   error: string | null;
+  /** Ikke en feil, men verdt å si fra om — f.eks. at køen venter på vaktposten. */
+  notice: string | null;
 }
 
 const ACTIVE: JobStatus[] = ["queued", "running"];
@@ -57,6 +59,7 @@ export function useGenerationJob(initialProjectId: string | null) {
     projectId: initialProjectId,
     starting: false,
     error: null,
+    notice: null,
   });
 
   const projectIdRef = useRef<string | null>(initialProjectId);
@@ -140,7 +143,7 @@ export function useGenerationJob(initialProjectId: string | null) {
   const start = useCallback(
     async (payload: object): Promise<string | null> => {
       failuresRef.current = 0;
-      setState((prev) => ({ ...prev, starting: true, error: null }));
+      setState((prev) => ({ ...prev, starting: true, error: null, notice: null }));
       try {
         const res = await fetch("/api/kickstart/generate", {
           method: "POST",
@@ -148,7 +151,7 @@ export function useGenerationJob(initialProjectId: string | null) {
           body: JSON.stringify(payload),
         });
         const data = (await res.json().catch(() => null)) as
-          | { project_id?: string; error?: string; details?: string[] }
+          | { project_id?: string; started?: boolean; error?: string; details?: string[] }
           | null;
 
         if (!res.ok) {
@@ -163,7 +166,16 @@ export function useGenerationJob(initialProjectId: string | null) {
 
         const projectId = data?.project_id ?? projectIdRef.current;
         projectIdRef.current = projectId ?? null;
-        setState((prev) => ({ ...prev, projectId: projectId ?? null }));
+        setState((prev) => ({
+          ...prev,
+          projectId: projectId ?? null,
+          // Jobben ER lagt i kø; serveren fikk bare ikke sparket den i gang med
+          // en gang. Vaktposten tar den — men brukeren skal slippe å lure.
+          notice:
+            data?.started === false
+              ? "Jobben ligger i kø, men serveren fikk ikke startet den umiddelbart. Vaktposten plukker den opp innen fem minutter."
+              : null,
+        }));
         await poll();
         return projectId ?? null;
       } catch (e) {

@@ -59,10 +59,19 @@ holder lenger forbindelsen som strømmet dem. Statusen viser i stedet fremdrift
 per del og de siste linjene som er lagret. Vi har også en tilstandsmaskin til å
 vedlikeholde.
 
-**Dette må vi passe på:** Cron krever `vercel.json` og et Vercel-abonnement som
-tillater hyppige kjøringer (Hobby er begrenset til én gang i døgnet — da er
-kjedingen fortsatt normalveien, men vaktposten blir treg). Worker-endepunktet må
-alltid være autentisert; det kan starte betalt arbeid.
+**Dette må vi passe på:** Cron krever `vercel.json` og et abonnement som tillater
+hyppige kjøringer (teamet er på Pro, så `*/5 * * * *` er greit; på Hobby ville
+det blitt én gang i døgnet). Worker-endepunktet må alltid være autentisert; det
+kan starte betalt arbeid.
+
+Og den lumske: **kjedingen går ut på nettet og inn igjen.** Prosjektet har
+Vercel Deployment Protection (SSO) på for alt unntatt egendefinerte domener, så
+treffer selvkallet et `.vercel.app`-domene, svarer Vercel med sin egen
+innloggingsside og jobben starter aldri. `NEXT_PUBLIC_SITE_URL` må derfor peke
+på `kickstart.mlit.no`. Kallet sender `x-vercel-protection-bypass` når Vercel har
+gitt oss en slik nøkkel, `triggerWorker` logger eksplisitt hva som er galt ved
+401/403, og `/api/kickstart/health` prøver selvkallet på ekte så feilen kan
+oppdages med ett klikk i stedet for ved at ingenting skjer.
 
 ## Når bør dette tas opp igjen
 

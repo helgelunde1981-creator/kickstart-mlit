@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { missingStandardsFiles } from "@/lib/kickstart/standards";
 import { CLAUDE_MODEL } from "@/lib/kickstart/model";
+import { probeSelfUrl } from "@/lib/kickstart/dispatch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,9 @@ export async function GET() {
     LEADRADAR_HANDOFF_SECRET: Boolean(process.env.LEADRADAR_HANDOFF_SECRET),
   };
 
+  // Bakgrunnsgenereringen står og faller på at appen når seg selv.
+  const self = await probeSelfUrl();
+
   // Kun det som må være på plass for kjerneflyten avgjør ok/ikke ok.
   const required = [
     "ANTHROPIC_API_KEY",
@@ -35,14 +39,17 @@ export async function GET() {
   ] as const;
   const missingEnv = required.filter((k) => !env[k]);
 
+  const ok = missing.length === 0 && missingEnv.length === 0 && self.reachable;
+
   return NextResponse.json(
     {
-      ok: missing.length === 0 && missingEnv.length === 0,
+      ok,
       model: CLAUDE_MODEL,
       missing_standards: missing,
       missing_env: missingEnv,
+      self_url: self,
       env,
     },
-    { status: missing.length === 0 && missingEnv.length === 0 ? 200 : 503 },
+    { status: ok ? 200 : 503 },
   );
 }

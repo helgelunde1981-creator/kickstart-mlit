@@ -41,7 +41,9 @@ tabellen `kickstart_generation_jobs` kan ingen jobb legges i kø. Kjør det mot 
 kommet til senere) via Supabase SQL-editor eller `supabase db push`.
 
 `GET /api/kickstart/health` (krever innlogging) svarer på om standardfilene og
-miljøvariablene faktisk er på plass i miljøet du kjører i.
+miljøvariablene er på plass — og om appen faktisk **når seg selv** på URL-en
+bakgrunnsjobben bruker. Svarer den `ok: false` med `self_url.reachable: false`,
+kommer ingen generering i gang.
 
 ---
 
@@ -129,7 +131,9 @@ advarselen i [AGENTS.md](./AGENTS.md).
 | `BOOTSTRAP_GITHUB_TOKEN`, `BOOTSTRAP_GITHUB_OWNER` | Ingen GitHub-repo i bootstrap |
 | `SUPABASE_MANAGEMENT_TOKEN`, `SUPABASE_ORG_ID` | Ingen Supabase-prosjekt i bootstrap |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | Ingen Vercel-prosjekt i bootstrap |
+| `NEXT_PUBLIC_SITE_URL` | **Viktig:** må peke på `https://kickstart.mlit.no`. Vercel Deployment Protection (SSO) er på for alle `.vercel.app`-domener, så et selvkall dit blir avvist og bakgrunnsjobben starter aldri. Sjekk med `/api/kickstart/health` |
 | `GENERATION_WORKER_SECRET` | Appen bruker `ADMIN_PASSWORD` når den kaller seg selv (worker/cron) |
+| `VERCEL_AUTOMATION_BYPASS_SECRET` | Settes automatisk av Vercel hvis «Protection Bypass for Automation» er på — brukes som reserve når selvkallet treffer et beskyttet domene |
 | `CRON_SECRET` | Samme — settes den, brukes den også av Vercel Cron |
 | `LEADRADAR_HANDOFF_SECRET` | `/api/leadradar-handoff` svarer 401 på alt |
 | `NEXT_PUBLIC_SITE_URL` | LeadRadar får `https://kickstart.mlit.no` som lenkebase |

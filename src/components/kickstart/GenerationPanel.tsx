@@ -113,6 +113,10 @@ export default function GenerationPanel({ state }: { state: GenerationJobState }
           </p>
         )}
 
+        {state.notice && (
+          <p className="rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning">{state.notice}</p>
+        )}
+
         {state.error && (
           <p role="alert" className="text-sm text-danger">
             {state.error}

@@ -1,9 +1,9 @@
 "use client";
-import { useState, useRef, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { wizardSchema, WizardSchema } from "@/lib/kickstart/validation";
+import { wizardSchema, WizardSchema, DEFAULT_TECH_STACK } from "@/lib/kickstart/validation";
 import {
   TECH_OPTIONS,
   INTEGRATION_OPTIONS,
@@ -15,6 +15,8 @@ import {
 import ChipSelector from "./ChipSelector";
 import ColorPicker from "./ColorPicker";
 import DesignDirectionPreview from "./DesignDirectionPreview";
+import GenerationPanel from "./GenerationPanel";
+import { useSpecGeneration } from "./useSpecGeneration";
 
 const STEPS = [
   "Kundeinfo",
@@ -28,302 +30,185 @@ const STEPS = [
   "Bekreft",
 ];
 
+const FIELDS_BY_STEP: (keyof WizardSchema)[][] = [
+  ["client_name", "project_name", "existing_url"],
+  ["project_type", "sprint_estimate"],
+  ["tech_stack"],
+  ["integrations"],
+  ["design_direction"],
+  ["primary_color", "secondary_color"],
+  ["features"],
+  ["short_description", "long_description"],
+  [],
+];
+
 export default function KickstartWizard() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [genLog, setGenLog] = useState<string[]>([]);
-  const [liveText, setLiveText] = useState("");
-  const [currentPartTitle, setCurrentPartTitle] = useState("");
-  const [done, setDone] = useState(false);
-  const [createdId, setCreatedId] = useState<string | null>(null);
-  const liveRef = useRef<HTMLPreElement>(null);
-  const logRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (liveRef.current) {
-      liveRef.current.scrollTop = liveRef.current.scrollHeight;
-    }
-  }, [liveText]);
-
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
-  }, [genLog]);
+  const [maxStepReached, setMaxStepReached] = useState(0);
+  const { state, start, reset } = useSpecGeneration();
 
   const form = useForm<WizardSchema>({
     resolver: zodResolver(wizardSchema),
+    mode: "onTouched",
     defaultValues: {
-      client_name:       "",
-      project_name:      "",
-      contact_person:    "",
-      new_domain:        "",
-      existing_url:      "",
-      project_type:      "",
-      auth_type:         "supabase-auth",
-      sprint_estimate:   6,
-      requires_scrape:   false,
-      tech_stack:        ["nextjs", "typescript", "tailwind", "shadcn", "supabase", "supabase-auth", "vercel", "resend"],
-      integrations:      [],
-      design_direction:  "",
-      primary_color:     "#3B82F6",
-      secondary_color:   "",
+      client_name: "",
+      project_name: "",
+      contact_person: "",
+      new_domain: "",
+      existing_url: "",
+      project_type: "",
+      auth_type: "supabase-auth",
+      sprint_estimate: 6,
+      requires_scrape: false,
+      tech_stack: DEFAULT_TECH_STACK,
+      integrations: [],
+      design_direction: "",
+      primary_color: "#3B82F6",
+      secondary_color: "",
       motion_preference: "subtil",
-      features:          "",
-      extra_notes:       "",
+      features: "",
+      extra_notes: "",
       short_description: "",
-      long_description:  "",
+      long_description: "",
     },
   });
 
   const { register, watch, setValue, getValues, trigger, formState: { errors } } = form;
   const values = watch();
+  const started = state.running || state.finished || state.failed;
 
-  const fieldsByStep: (keyof WizardSchema)[][] = [
-    ["client_name", "project_name"],
-    ["project_type"],
-    ["tech_stack"],
-    ["integrations"],
-    ["design_direction"],
-    ["primary_color"],
-    ["features"],
-    ["short_description", "long_description"],
-    [],
-  ];
-
-  async function nextStep() {
-    const valid = await trigger(fieldsByStep[step]);
-    if (valid) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  async function goNext() {
+    const valid = await trigger(FIELDS_BY_STEP[step]);
+    if (!valid) return;
+    const next = Math.min(step + 1, STEPS.length - 1);
+    setStep(next);
+    setMaxStepReached((m) => Math.max(m, next));
   }
 
-  async function handleSubmit() {
-    setSubmitting(true);
-    setGenLog(["Starter generering av PROJECT.md..."]);
-    setLiveText("");
-    setCurrentPartTitle("");
-
-    let gotError = false;
-    let generationCompleted = false;
-    let localProjectId: string | null = null;
-    let localNextPart = 2;
-
-    async function readStream(fetchBody: object): Promise<"done" | "continue" | "error"> {
-      let res: Response;
-      try {
-        res = await fetch("/api/kickstart/stream", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(fetchBody),
-        });
-      } catch (e) {
-        setGenLog((p) => [...p, `Nettverksfeil: ${(e as Error).message}`]);
-        return "error";
-      }
-      if (!res.ok || !res.body) {
-        setGenLog((p) => [...p, `Serverfeil: ${res.status} ${res.statusText}`]);
-        return "error";
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done: rdone, value } = await reader.read();
-        if (rdone) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data:")) continue;
-          let event: Record<string, unknown>;
-          try { event = JSON.parse(line.slice(5).trim()); } catch { continue; }
-
-          if (event.type === "project_id") {
-            localProjectId = event.id as string;
-            setCreatedId(event.id as string);
-          } else if (event.type === "start_part") {
-            setCurrentPartTitle(event.title as string);
-            setLiveText("");
-            setGenLog((p) => [...p, `Genererer: ${event.title as string}`]);
-          } else if (event.type === "delta") {
-            setLiveText((p) => p + (event.text as string));
-          } else if (event.type === "part") {
-            setGenLog((p) => {
-              const next = [...p];
-              let idx = -1;
-              for (let j = next.length - 1; j >= 0; j--) {
-                if (next[j].startsWith("Genererer:")) { idx = j; break; }
-              }
-              if (idx !== -1) next[idx] = `✓ ${event.title as string}`;
-              return next;
-            });
-            setLiveText("");
-            setCurrentPartTitle("");
-          } else if (event.type === "continue") {
-            localProjectId = event.project_id as string;
-            localNextPart = (event.next_part as number) ?? 2;
-            setCreatedId(event.project_id as string);
-            const nextPart = event.next_part as number;
-            setGenLog((p) => [...p, `Del ${nextPart - 1} lagret ✓ — starter Del ${nextPart}...`]);
-            return "continue";
-          } else if (event.type === "done") {
-            generationCompleted = true;
-            setGenLog((p) => [...p, "PROJECT.md generert og lagret!"]);
-            setLiveText("");
-            setCurrentPartTitle("");
-            setDone(true);
-            return "done";
-          } else if (event.type === "error") {
-            setGenLog((p) => [...p, `Feil: ${event.message as string}`]);
-            return "error";
-          }
-        }
-      }
-      return "done";
-    }
-
-    let result = await readStream(getValues());
-    while (result === "continue" && localProjectId) {
-      result = await readStream({ project_id: localProjectId, part: localNextPart });
-    }
-    if (result === "error") gotError = true;
-
-    if (gotError) {
-      setSubmitting(false); // vis wizard igjen for retry ved ekte feil
-    } else if (!generationCompleted) {
-      // Avbrutt stille (nettverkshiccup, mobil, o.l.) — hold genereringsskjermen oppe
-      setGenLog((p) => [
-        ...p,
-        `⚠️ Avbrutt etter Del ${localNextPart - 1} av 12. Prosjektet er delvis lagret.`,
-        localProjectId
-          ? `Gå til prosjektlisten og bruk "Regenerer spec" på "${getValues().project_name}".`
-          : "Prøv å starte på nytt.",
-      ]);
-    }
-    // Hvis generationCompleted: done-skjermen vises automatisk via setDone(true)
+  function goBack() {
+    setStep((s) => Math.max(s - 1, 0));
   }
 
-  if (done && createdId) {
+  async function handleFormSubmit(e: React.FormEvent) {
+    // Enter i et felt skal føre videre i stegene, ikke sende av gårde en
+    // 15-minutters generering ved et uhell.
+    e.preventDefault();
+    if (step < STEPS.length - 1) {
+      await goNext();
+      return;
+    }
+    await start(getValues());
+  }
+
+  // === Ferdig ===
+  if (state.finished && state.projectId) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-        <div className="text-5xl mb-4 font-mono text-green-500">✓</div>
-        <h2 className="text-xl font-bold text-gray-900 mb-2">Prosjekt opprettet!</h2>
-        <p className="text-gray-500 mb-6">PROJECT.md er generert og lagret i databasen.</p>
-        <button
-          onClick={() => router.push(`/admin/kickstart/${createdId}`)}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700"
-        >
-          Se prosjektet →
-        </button>
+      <div className="space-y-4">
+        <GenerationPanel state={state} />
+        <div className="card p-6 text-center">
+          <p className="mb-1 font-medium">Prosjektet er opprettet</p>
+          <p className="mb-5 text-sm text-muted">
+            PROJECT.md er generert i {state.totalParts} deler og lagret.
+          </p>
+          <button
+            onClick={() => router.push(`/admin/kickstart/${state.projectId}`)}
+            className="btn btn-primary"
+          >
+            Åpne prosjektet
+          </button>
+        </div>
       </div>
     );
   }
 
-  if (submitting) {
-    const hasFailed = genLog.some((l) => l.startsWith("Feil:") || l.startsWith("Nettverksfeil:") || l.startsWith("Serverfeil:"));
+  // === Under generering / feilet ===
+  if (started) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">
-            {hasFailed ? "Generering feilet" : "Genererer PROJECT.md..."}
-          </h2>
-          {currentPartTitle && (
-            <span className="text-xs text-gray-400 font-mono truncate max-w-sm">{currentPartTitle}</span>
-          )}
-        </div>
-
-        {/* Logg — fullførte deler */}
-        <div
-          ref={logRef}
-          className="bg-gray-950 px-4 py-3 font-mono text-xs space-y-0.5 max-h-32 overflow-y-auto"
-        >
-          {genLog.map((l, i) => (
-            <div
-              key={i}
-              className={
-                l.startsWith("✓")
-                  ? "text-green-400"
-                  : l.startsWith("Feil:") || l.startsWith("Nettverksfeil:") || l.startsWith("Serverfeil:")
-                  ? "text-red-400"
-                  : l.startsWith("PROJECT.md")
-                  ? "text-green-300 font-bold"
-                  : "text-gray-400"
-              }
-            >
-              {l.startsWith("✓") || l.startsWith("PROJECT.md") ? l : l.startsWith("Genererer:") ? `▶ ${l.replace("Genererer: ", "")}` : l}
+      <div className="space-y-4">
+        <GenerationPanel state={state} />
+        {state.failed && (
+          <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm text-muted">
+              {state.projectId
+                ? "Delene som ble ferdige er lagret. Fortsett fra prosjektsiden."
+                : "Ingenting ble lagret — prøv igjen."}
+            </p>
+            <div className="flex gap-2">
+              {state.projectId && (
+                <button
+                  onClick={() => router.push(`/admin/kickstart/${state.projectId}`)}
+                  className="btn btn-primary"
+                >
+                  Åpne prosjektet
+                </button>
+              )}
+              <button onClick={reset} className="btn btn-secondary">
+                Tilbake til skjemaet
+              </button>
             </div>
-          ))}
-          {!hasFailed && !done && <div className="text-blue-400 animate-pulse">▋</div>}
-        </div>
-
-        {/* Live tekst — strømmer inn */}
-        {liveText && (
-          <pre
-            ref={liveRef}
-            className="bg-gray-900 px-4 py-3 font-mono text-xs text-green-300 leading-relaxed overflow-y-auto max-h-80 whitespace-pre-wrap break-words"
-          >
-            {liveText}
-          </pre>
-        )}
-
-        {hasFailed && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            <button
-              onClick={() => { setSubmitting(false); setGenLog([]); setLiveText(""); setCurrentPartTitle(""); }}
-              className="text-sm text-gray-500 hover:text-gray-700"
-            >
-              ← Prøv igjen
-            </button>
           </div>
         )}
       </div>
     );
   }
 
+  // === Skjemaet ===
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-      {/* Step indicator */}
-      <div className="px-6 py-4 border-b border-gray-100">
-        <div className="flex items-center gap-1 flex-wrap">
-          {STEPS.map((label, i) => (
-            <div key={i} className="flex items-center gap-1">
-              <div
-                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium
-                  ${i < step ? "bg-blue-600 text-white" : i === step ? "bg-blue-100 text-blue-700 ring-2 ring-blue-600" : "bg-gray-100 text-gray-400"}`}
-              >
-                {i < step ? "✓" : i + 1}
-              </div>
-              {i < STEPS.length - 1 && (
-                <div className={`h-px w-3 ${i < step ? "bg-blue-600" : "bg-gray-200"}`} />
-              )}
-            </div>
-          ))}
-        </div>
-        <p className="mt-2 text-sm font-medium text-gray-700">{STEPS[step]}</p>
+    <form onSubmit={handleFormSubmit} className="card overflow-hidden" noValidate>
+      <div className="border-b border-line px-4 py-4 sm:px-6">
+        <ol className="flex flex-wrap items-center gap-1.5">
+          {STEPS.map((label, i) => {
+            const reachable = i <= maxStepReached;
+            return (
+              <li key={label} className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => reachable && setStep(i)}
+                  disabled={!reachable}
+                  aria-current={i === step ? "step" : undefined}
+                  title={label}
+                  className={`grid h-7 w-7 place-items-center rounded-full text-xs font-medium transition-colors
+                    ${
+                      i < step
+                        ? "bg-accent text-on-accent"
+                        : i === step
+                          ? "bg-accent-soft text-accent ring-2 ring-accent"
+                          : "bg-surface-2 text-faint"
+                    } ${reachable ? "cursor-pointer" : "cursor-not-allowed"}`}
+                >
+                  <span className="sr-only">{label}</span>
+                  <span aria-hidden>{i < step ? "✓" : i + 1}</span>
+                </button>
+                {i < STEPS.length - 1 && (
+                  <span aria-hidden className={`h-px w-3 ${i < step ? "bg-accent" : "bg-line"}`} />
+                )}
+              </li>
+            );
+          })}
+        </ol>
+        <p className="mt-2.5 text-sm font-medium">
+          Steg {step + 1} av {STEPS.length} — {STEPS[step]}
+        </p>
       </div>
 
-      {/* Step content */}
-      <div className="p-6 space-y-4">
-
+      <div className="space-y-5 p-4 sm:p-6">
         {/* Steg 0: Kundeinfo */}
         {step === 0 && (
           <>
             <Row2>
-              <Field label="Kundenavn" error={errors.client_name?.message}>
-                <input {...register("client_name")} className={inp()} placeholder="Acme AS" />
+              <Field id="client_name" label="Kundenavn" error={errors.client_name?.message}>
+                <input id="client_name" {...register("client_name")} className="input" placeholder="Acme AS" autoFocus />
               </Field>
-              <Field label="Prosjektnavn" error={errors.project_name?.message}>
-                <input {...register("project_name")} className={inp()} placeholder="Acme Kundeportal" />
+              <Field id="project_name" label="Prosjektnavn" error={errors.project_name?.message}>
+                <input id="project_name" {...register("project_name")} className="input" placeholder="Acme Kundeportal" />
               </Field>
             </Row2>
-            <Field label="Kontaktperson (navn + e-post)">
-              <input {...register("contact_person")} className={inp()} placeholder="Kari Nordmann — kari@acme.no" />
+            <Field id="contact_person" label="Kontaktperson (navn + e-post)" hint="Brukes i §7.2 Kontaktinfo i specen.">
+              <input id="contact_person" {...register("contact_person")} className="input" placeholder="Kari Nordmann — kari@acme.no" />
             </Field>
-            <Field label="Nytt domene">
-              <input {...register("new_domain")} className={inp()} placeholder="acme.no" />
+            <Field id="new_domain" label="Nytt domene">
+              <input id="new_domain" {...register("new_domain")} className="input" placeholder="acme.no" />
             </Field>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
@@ -332,19 +217,16 @@ export default function KickstartWizard() {
                   id="requires_scrape"
                   checked={values.requires_scrape}
                   onChange={(e) => setValue("requires_scrape", e.target.checked)}
-                  className="w-4 h-4 text-blue-600"
+                  className="h-4 w-4 accent-[var(--accent)]"
                 />
-                <label htmlFor="requires_scrape" className="text-sm text-gray-700">
+                <label htmlFor="requires_scrape" className="text-sm">
                   Scrape eksisterende nettsted og importer innhold
                 </label>
               </div>
               {values.requires_scrape && (
-                <input
-                  {...register("existing_url")}
-                  className={inp()}
-                  placeholder="https://gammel.acme.no"
-                  autoFocus
-                />
+                <Field id="existing_url" label="URL som skal scrapes" error={errors.existing_url?.message}>
+                  <input id="existing_url" {...register("existing_url")} className="input" placeholder="https://gammel.acme.no" autoFocus />
+                </Field>
               )}
             </div>
           </>
@@ -353,43 +235,54 @@ export default function KickstartWizard() {
         {/* Steg 1: Prosjekttype */}
         {step === 1 && (
           <>
-            <Field label="Prosjekttype" error={errors.project_type?.message}>
-              <div className="grid grid-cols-3 gap-2">
+            <fieldset>
+              <legend className="field-label">Prosjekttype</legend>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {PROJECT_TYPES.map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setValue("project_type", t.id)}
-                    className={`text-left px-3 py-2 rounded-lg border text-sm
-                      ${values.project_type === t.id
-                        ? "border-blue-600 bg-blue-50 text-blue-700 font-medium"
-                        : "border-gray-200 text-gray-700 hover:border-gray-300"}`}
+                    onClick={() => setValue("project_type", t.id, { shouldValidate: true })}
+                    aria-pressed={values.project_type === t.id}
+                    className="choice px-3 py-2 text-sm"
                   >
                     {t.label}
                   </button>
                 ))}
               </div>
-            </Field>
+              {errors.project_type?.message && (
+                <p className="mt-1.5 text-xs text-danger">{errors.project_type.message}</p>
+              )}
+            </fieldset>
             <Row2>
-              <Field label="Autentisering">
+              <Field id="auth_type" label="Autentisering">
                 <select
+                  id="auth_type"
                   value={values.auth_type}
                   onChange={(e) => setValue("auth_type", e.target.value)}
-                  className={inp()}
+                  className="input"
                 >
                   {AUTH_OPTIONS.map((o) => (
-                    <option key={o.id} value={o.id}>{o.label} — {o.description}</option>
+                    <option key={o.id} value={o.id}>
+                      {o.label} — {o.description}
+                    </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Estimert antall sprinter">
+              <Field
+                id="sprint_estimate"
+                label="Estimert antall sprinter"
+                error={errors.sprint_estimate?.message}
+                hint="Styrer hvor mange sprinter sprintplanen i §20 deles opp i."
+              >
                 <input
+                  id="sprint_estimate"
                   type="number"
                   min={1}
                   max={20}
                   value={values.sprint_estimate}
-                  onChange={(e) => setValue("sprint_estimate", parseInt(e.target.value) || 6)}
-                  className={inp()}
+                  onChange={(e) => setValue("sprint_estimate", parseInt(e.target.value) || 6, { shouldValidate: true })}
+                  className="input"
                 />
               </Field>
             </Row2>
@@ -398,109 +291,127 @@ export default function KickstartWizard() {
 
         {/* Steg 2: Teknologier */}
         {step === 2 && (
-          <Field label="Teknologier" error={errors.tech_stack?.message}>
+          <fieldset>
+            <legend className="field-label">Teknologier</legend>
+            <p className="mb-3 text-xs text-muted">
+              Standard-stacken er forhåndsvalgt. Avvik fra den må begrunnes i specen (§8.1).
+            </p>
             <ChipSelector
               options={TECH_OPTIONS}
               selected={values.tech_stack}
-              onChange={(v) => setValue("tech_stack", v)}
+              onChange={(v) => setValue("tech_stack", v, { shouldValidate: true })}
             />
-          </Field>
+            {errors.tech_stack?.message && (
+              <p className="mt-2 text-xs text-danger">{errors.tech_stack.message}</p>
+            )}
+          </fieldset>
         )}
 
         {/* Steg 3: Integrasjoner */}
         {step === 3 && (
-          <Field label="Integrasjoner (velg det som er relevant)">
+          <fieldset>
+            <legend className="field-label">Integrasjoner</legend>
+            <p className="mb-3 text-xs text-muted">Velg det som er relevant — hopp over hvis ingen.</p>
             <ChipSelector
               options={INTEGRATION_OPTIONS}
               selected={values.integrations}
               onChange={(v) => setValue("integrations", v)}
             />
-          </Field>
+          </fieldset>
         )}
 
         {/* Steg 4: Designretning */}
         {step === 4 && (
-          <Field label="Designretning (2026)" error={errors.design_direction?.message}>
-            <div className="grid grid-cols-2 gap-3">
+          <fieldset>
+            <legend className="field-label">Designretning (2026)</legend>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {DESIGN_DIRECTIONS.map((d) => {
                 const sel = values.design_direction === d.id;
                 return (
                   <button
                     key={d.id}
                     type="button"
-                    onClick={() => setValue("design_direction", d.id)}
-                    className={`text-left rounded-xl border overflow-hidden transition-all
-                      ${sel ? "border-blue-600 ring-2 ring-blue-600" : "border-gray-200 hover:border-gray-300"}`}
+                    onClick={() => setValue("design_direction", d.id, { shouldValidate: true })}
+                    aria-pressed={sel}
+                    className="choice overflow-hidden p-0"
                   >
                     <DesignDirectionPreview id={d.id} selected={sel} />
                     <div className="px-3 py-2">
-                      <p className={`text-xs font-semibold leading-tight ${sel ? "text-blue-700" : "text-gray-900"}`}>
+                      <p className={`text-xs font-semibold leading-tight ${sel ? "text-accent" : ""}`}>
                         {d.label}
                       </p>
-                      <p className="text-xs text-gray-400 mt-0.5 leading-snug line-clamp-2">{d.suitedFor}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted">{d.suitedFor}</p>
                     </div>
                   </button>
                 );
               })}
             </div>
-          </Field>
+            {errors.design_direction?.message && (
+              <p className="mt-2 text-xs text-danger">{errors.design_direction.message}</p>
+            )}
+          </fieldset>
         )}
 
         {/* Steg 5: Designdetaljer */}
         {step === 5 && (
           <>
             <Row2>
+              <ColorPicker value={values.primary_color} onChange={(v) => setValue("primary_color", v, { shouldValidate: true })} />
               <ColorPicker
-                value={values.primary_color}
-                onChange={(v) => setValue("primary_color", v)}
+                value={values.secondary_color}
+                onChange={(v) => setValue("secondary_color", v, { shouldValidate: true })}
+                label="Sekundærfarge (valgfri)"
+                loadPriorColors={false}
               />
-              <Field label="Sekundærfarge (valgfri)">
-                <input
-                  type="text"
-                  value={values.secondary_color}
-                  onChange={(e) => setValue("secondary_color", e.target.value)}
-                  className={inp()}
-                  placeholder="#10B981"
-                />
-              </Field>
             </Row2>
-            <Field label="Bevegelse / motion">
-              <div className="grid grid-cols-3 gap-2">
+            {(errors.primary_color?.message || errors.secondary_color?.message) && (
+              <p className="text-xs text-danger">
+                {errors.primary_color?.message ?? errors.secondary_color?.message}
+              </p>
+            )}
+            <fieldset>
+              <legend className="field-label">Bevegelse / motion</legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {MOTION_OPTIONS.map((o) => (
                   <button
                     key={o.id}
                     type="button"
                     onClick={() => setValue("motion_preference", o.id)}
-                    className={`text-left px-3 py-2 rounded-lg border text-sm
-                      ${values.motion_preference === o.id
-                        ? "border-blue-600 bg-blue-50 text-blue-700"
-                        : "border-gray-200 text-gray-700 hover:border-gray-300"}`}
+                    aria-pressed={values.motion_preference === o.id}
+                    className="choice px-3 py-2 text-sm"
                   >
-                    <p className="font-medium">{o.label}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{o.description}</p>
+                    <span className="block font-medium">{o.label}</span>
+                    <span className="mt-0.5 block text-xs text-muted">{o.description}</span>
                   </button>
                 ))}
               </div>
-            </Field>
+            </fieldset>
           </>
         )}
 
         {/* Steg 6: Features */}
         {step === 6 && (
           <>
-            <Field label="Features og krav (ett per linje)">
+            <Field
+              id="features"
+              label="Features og krav (ett per linje)"
+              hint="Alt som står her blir til deep-dives i §10. Er lista tom, stiller Claude spørsmål i stedet."
+              error={errors.features?.message}
+            >
               <textarea
+                id="features"
                 {...register("features")}
-                rows={7}
-                className={inp()}
-                placeholder={`- Brukerpålogging med e-post\n- Dashbord med oversikt over bestillinger\n- Admin-panel for å redigere innhold\n- Kontaktskjema med e-postvarsling\n- Priskalkulatoren på forsiden`}
+                rows={8}
+                className="input"
+                placeholder={`- Brukerpålogging med e-post\n- Dashbord med oversikt over bestillinger\n- Admin-panel for å redigere innhold\n- Kontaktskjema med e-postvarsling\n- Priskalkulator på forsiden`}
               />
             </Field>
-            <Field label="Ekstra notater til Claude">
+            <Field id="extra_notes" label="Ekstra notater til Claude">
               <textarea
+                id="extra_notes"
                 {...register("extra_notes")}
                 rows={3}
-                className={inp()}
+                className="input"
                 placeholder="Spesielle hensyn, ting å unngå, ønsker om tone/stil, eksisterende brandmateriale, o.l."
               />
             </Field>
@@ -510,19 +421,26 @@ export default function KickstartWizard() {
         {/* Steg 7: Beskrivelse */}
         {step === 7 && (
           <>
-            <Field label="Kort beskrivelse (1 setning)" error={errors.short_description?.message}>
+            <Field id="short_description" label="Kort beskrivelse (1 setning)" error={errors.short_description?.message}>
               <input
+                id="short_description"
                 {...register("short_description")}
-                className={inp()}
+                className="input"
                 placeholder="En B2B-portal der Acmes kunder bestiller, sporer og fakturerer leveranser"
               />
             </Field>
-            <Field label="Detaljert beskrivelse" error={errors.long_description?.message}>
+            <Field
+              id="long_description"
+              label="Detaljert beskrivelse"
+              hint={`${values.long_description.length} tegn — jo mer kontekst, desto bedre spec.`}
+              error={errors.long_description?.message}
+            >
               <textarea
+                id="long_description"
                 {...register("long_description")}
-                rows={7}
-                className={inp()}
-                placeholder="Beskriv formål, målgruppe, kjerneflyt, konkurransefortrinn, spesielle krav, integrasjoner, geografi, forventet trafikk, o.l. Jo mer desto bedre — Claude bruker alt dette."
+                rows={8}
+                className="input"
+                placeholder="Formål, målgruppe, kjerneflyt, konkurransefortrinn, spesielle krav, integrasjoner, geografi, forventet trafikk…"
               />
             </Field>
           </>
@@ -530,81 +448,95 @@ export default function KickstartWizard() {
 
         {/* Steg 8: Bekreft */}
         {step === 8 && (
-          <div className="space-y-2 text-sm">
+          <div className="space-y-1.5 text-sm">
             <SummaryRow label="Kunde" value={values.client_name} />
             <SummaryRow label="Prosjekt" value={values.project_name} />
             {values.new_domain && <SummaryRow label="Domene" value={values.new_domain} />}
-            <SummaryRow label="Type" value={PROJECT_TYPES.find(t => t.id === values.project_type)?.label ?? values.project_type} />
-            <SummaryRow label="Designretning" value={DESIGN_DIRECTIONS.find(d => d.id === values.design_direction)?.label ?? values.design_direction} />
-            <SummaryRow label="Teknologier" value={values.tech_stack.join(", ")} />
-            {values.integrations.length > 0 && <SummaryRow label="Integrasjoner" value={values.integrations.join(", ")} />}
-            <SummaryRow label="Motion" value={MOTION_OPTIONS.find(o => o.id === values.motion_preference)?.label ?? values.motion_preference} />
+            <SummaryRow label="Type" value={labelOf(values.project_type, PROJECT_TYPES)} />
+            <SummaryRow label="Auth" value={labelOf(values.auth_type, AUTH_OPTIONS)} />
+            <SummaryRow label="Designretning" value={labelOf(values.design_direction, DESIGN_DIRECTIONS)} />
+            <SummaryRow label="Teknologier" value={values.tech_stack.map((t) => labelOf(t, TECH_OPTIONS)).join(", ")} />
+            {values.integrations.length > 0 && (
+              <SummaryRow label="Integrasjoner" value={values.integrations.map((t) => labelOf(t, INTEGRATION_OPTIONS)).join(", ")} />
+            )}
+            <SummaryRow label="Motion" value={labelOf(values.motion_preference, MOTION_OPTIONS)} />
             <SummaryRow label="Primærfarge" value={values.primary_color} color={values.primary_color} />
-            <SummaryRow label="Sprinter" value={`${values.sprint_estimate} sprinter`} />
+            <SummaryRow label="Sprinter" value={`${values.sprint_estimate}`} />
+            {values.requires_scrape && <SummaryRow label="Scrape" value={values.existing_url} />}
             <SummaryRow label="Beskrivelse" value={values.short_description} />
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg text-xs text-blue-700">
-              Claude vil generere en komplett PROJECT.md (~100 000 tokens, 12 deler) basert på MLIT-standardene (42 regler, 10/10-kvalitet). Dette tar 10–20 minutter.
+
+            <div className="mt-4 rounded-xl bg-accent-soft p-3 text-xs text-accent">
+              Claude genererer PROJECT.md i 12 deler etter MLIT-standardene. Det tar
+              10–20 minutter og koster penger i API-bruk. La fanen stå åpen — hver del
+              lagres underveis, så et avbrudd kan gjenopptas fra prosjektsiden.
             </div>
           </div>
         )}
       </div>
 
-      {/* Navigation */}
-      <div className="px-6 py-4 border-t border-gray-100 flex justify-between">
-        <button
-          type="button"
-          onClick={() => setStep((s) => Math.max(s - 1, 0))}
-          disabled={step === 0}
-          className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-30"
-        >
+      <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-4 sm:px-6">
+        <button type="button" onClick={goBack} disabled={step === 0} className="btn btn-ghost">
           ← Tilbake
         </button>
         {step < STEPS.length - 1 ? (
-          <button
-            type="button"
-            onClick={nextStep}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
+          <button type="submit" className="btn btn-primary">
             Neste →
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
-          >
+          <button type="submit" className="btn btn-primary">
             Generer PROJECT.md
           </button>
         )}
       </div>
-    </div>
+    </form>
   );
 }
 
-function inp() {
-  return "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+function labelOf(id: string, options: { id: string; label: string }[]): string {
+  return options.find((o) => o.id === id)?.label ?? id;
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+function Field({
+  id,
+  label,
+  error,
+  hint,
+  children,
+}: {
+  id: string;
+  label: string;
+  error?: string;
+  hint?: string;
+  children: ReactNode;
+}) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="field-label">
+        {label}
+      </label>
       {children}
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {hint && !error && <p className="mt-1 text-xs text-faint">{hint}</p>}
+      {error && (
+        <p role="alert" className="mt-1 text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
 
 function Row2({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-2 gap-4">{children}</div>;
+  return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>;
 }
 
 function SummaryRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex justify-between gap-4">
-      <span className="text-gray-400 shrink-0">{label}</span>
-      <span className="text-gray-900 font-medium text-right flex items-center gap-1.5">
-        {color && <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />}
+    <div className="flex justify-between gap-4 border-b border-line py-1.5 last:border-0">
+      <span className="shrink-0 text-muted">{label}</span>
+      <span className="flex items-center gap-1.5 text-right font-medium">
+        {color && (
+          <span aria-hidden className="h-3 w-3 shrink-0 rounded-full ring-1 ring-line" style={{ backgroundColor: color }} />
+        )}
         {value}
       </span>
     </div>

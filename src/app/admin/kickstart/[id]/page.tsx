@@ -1,9 +1,33 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { getProject } from "@/lib/kickstart/queries";
+import { TOTAL_PARTS } from "@/lib/kickstart/generate";
 import ProjectDetailClient from "./ProjectDetailClient";
 
 export const dynamic = "force-dynamic";
+
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Utkast",
+  generated: "Generert",
+  bootstrapped: "Bootstrapped",
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  draft: "bg-warning-soft text-warning",
+  generated: "bg-accent-soft text-accent",
+  bootstrapped: "bg-success-soft text-success",
+};
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const project = await getProject(id);
+  return { title: project?.project_name ?? "Prosjekt" };
+}
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,16 +35,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!project) notFound();
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/admin/kickstart" className="text-gray-400 hover:text-gray-600 text-sm">
-          ← Tilbake
+    <>
+      <div className="mb-6">
+        <Link href="/admin/kickstart" className="text-sm text-muted hover:text-fg">
+          ← Prosjekter
         </Link>
-        <h1 className="text-2xl font-bold text-gray-900">{project.project_name}</h1>
-        <span className="text-gray-400">·</span>
-        <span className="text-gray-500">{project.client_name}</span>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-2xl font-semibold">{project.project_name}</h1>
+          <span className={`badge ${STATUS_STYLES[project.status] ?? "bg-surface-2 text-muted"}`}>
+            {STATUS_LABELS[project.status] ?? project.status}
+          </span>
+        </div>
+        <p className="text-sm text-muted">{project.client_name}</p>
       </div>
-      <ProjectDetailClient project={project} />
-    </div>
+      <ProjectDetailClient project={project} totalParts={TOTAL_PARTS} />
+    </>
   );
 }

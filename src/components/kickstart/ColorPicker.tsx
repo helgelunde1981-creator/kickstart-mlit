@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 const PRESETS = [
   "#3B82F6", "#10B981", "#F59E0B", "#EF4444",
@@ -14,14 +14,20 @@ interface Props {
   loadPriorColors?: boolean;
 }
 
-export default function ColorPicker({ value, onChange, label = "Primærfarge", loadPriorColors = true }: Props) {
+export default function ColorPicker({
+  value,
+  onChange,
+  label = "Primærfarge",
+  loadPriorColors = true,
+}: Props) {
   const [priorColors, setPriorColors] = useState<string[]>([]);
+  const id = useId();
 
   useEffect(() => {
     if (!loadPriorColors) return;
     fetch("/api/kickstart/prior-colors")
-      .then((r) => r.json())
-      .then((colors: string[]) => setPriorColors(colors))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((colors: string[]) => setPriorColors(Array.isArray(colors) ? colors : []))
       .catch(() => {});
   }, [loadPriorColors]);
 
@@ -29,41 +35,48 @@ export default function ColorPicker({ value, onChange, label = "Primærfarge", l
 
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-3">{label}</label>
+      <label htmlFor={`${id}-hex`} className="field-label">
+        {label}
+      </label>
 
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label={`${label} — forhåndsvalg`}>
         {allColors.map((c) => (
           <button
             key={c}
             type="button"
             onClick={() => onChange(c)}
-            className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110
-              ${value === c ? "border-gray-900 scale-110" : "border-transparent"}`}
+            aria-label={`Velg ${c}`}
+            aria-pressed={value.toLowerCase() === c.toLowerCase()}
+            title={priorColors.includes(c) ? `${c} — brukt i et tidligere prosjekt` : c}
+            className={`h-8 w-8 rounded-full transition-transform hover:scale-110 ${
+              value.toLowerCase() === c.toLowerCase()
+                ? "scale-110 ring-2 ring-fg ring-offset-2 ring-offset-[var(--surface)]"
+                : "ring-1 ring-line"
+            }`}
             style={{ backgroundColor: c }}
-            title={c}
           />
         ))}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <input
           type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-10 h-10 rounded-lg cursor-pointer border border-gray-200"
+          value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#3B82F6"}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          aria-label={`${label} — fargevelger`}
+          className="h-10 w-12 cursor-pointer rounded-lg border border-line bg-surface p-1"
         />
         <input
+          id={`${id}-hex`}
           type="text"
           value={value}
           onChange={(e) => {
-            if (/^#[0-9a-fA-F]{0,6}$/.test(e.target.value)) onChange(e.target.value);
+            const next = e.target.value.toUpperCase();
+            if (/^#?[0-9A-F]{0,6}$/.test(next)) onChange(next.startsWith("#") || next === "" ? next : `#${next}`);
           }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-32 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="input w-32 font-mono"
           placeholder="#3B82F6"
-        />
-        <div
-          className="w-10 h-10 rounded-lg border border-gray-200"
-          style={{ backgroundColor: value }}
+          spellCheck={false}
         />
       </div>
     </div>

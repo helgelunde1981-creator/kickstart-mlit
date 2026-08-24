@@ -5,6 +5,7 @@ import {
   INTEGRATION_OPTIONS,
   DESIGN_DIRECTIONS,
   MOTION_OPTIONS,
+  AUTH_OPTIONS,
 } from "@/lib/kickstart/tech-options";
 import { KickstartProject } from "@/lib/kickstart/types";
 import { ProjectEditableFields } from "@/lib/kickstart/queries";
@@ -22,19 +23,22 @@ export default function ProjectEditForm({ project, onSaved, onCancel }: Props) {
   const [techStack, setTechStack] = useState<string[]>(project.tech_stack ?? []);
   const [integrations, setIntegrations] = useState<string[]>(project.integrations ?? []);
   const [designDirection, setDesignDirection] = useState(project.design_direction ?? "03-swiss-minimal-refined");
+  const [authType, setAuthType] = useState(project.auth_type ?? "supabase-auth");
   const [primaryColor, setPrimaryColor] = useState(project.primary_color ?? "#3B82F6");
   const [secondaryColor, setSecondaryColor] = useState(project.secondary_color ?? "");
   const [motionPreference, setMotionPreference] = useState(project.motion_preference ?? "subtil");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function save() {
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
     setSaving(true);
     setError(null);
     const fields: ProjectEditableFields = {
       tech_stack: techStack,
       integrations,
       design_direction: designDirection,
+      auth_type: authType,
       primary_color: primaryColor,
       secondary_color: secondaryColor,
       motion_preference: motionPreference,
@@ -58,29 +62,30 @@ export default function ProjectEditForm({ project, onSaved, onCancel }: Props) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-6">
+    <form onSubmit={save} className="card space-y-6 p-5">
       <div>
-        <h2 className="font-semibold text-gray-900 mb-1">Rediger prosjekt</h2>
+        <h2 className="font-semibold">Rediger prosjekt</h2>
         {project.project_md && (
-          <p className="text-xs text-amber-600">
-            PROJECT.md er allerede generert med de gamle verdiene — trykk &quot;Regenerer spec&quot; etter lagring for at endringene skal slå inn.
+          <p className="mt-1 text-xs text-warning">
+            PROJECT.md er allerede generert med de gamle verdiene. Endringene slår først inn når du
+            regenererer specen.
           </p>
         )}
       </div>
 
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Teknologier</p>
+        <p className="field-label">Teknologier</p>
         <ChipSelector options={TECH_OPTIONS} selected={techStack} onChange={setTechStack} />
       </div>
 
       <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Integrasjoner</p>
+        <p className="field-label">Integrasjoner</p>
         <ChipSelector options={INTEGRATION_OPTIONS} selected={integrations} onChange={setIntegrations} />
       </div>
 
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Designretning</p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <fieldset>
+        <legend className="field-label">Designretning</legend>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {DESIGN_DIRECTIONS.map((d) => {
             const sel = designDirection === d.id;
             return (
@@ -88,65 +93,82 @@ export default function ProjectEditForm({ project, onSaved, onCancel }: Props) {
                 key={d.id}
                 type="button"
                 onClick={() => setDesignDirection(d.id)}
-                className={`text-left rounded-xl border overflow-hidden transition-all
-                  ${sel ? "border-blue-600 ring-2 ring-blue-600" : "border-gray-200 hover:border-gray-300"}`}
+                aria-pressed={sel}
+                className="choice overflow-hidden p-0"
               >
                 <DesignDirectionPreview id={d.id} selected={sel} />
                 <div className="px-3 py-2">
-                  <p className={`text-xs font-semibold leading-tight ${sel ? "text-blue-700" : "text-gray-900"}`}>
-                    {d.label}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5 leading-snug line-clamp-2">{d.suitedFor}</p>
+                  <p className={`text-xs font-semibold leading-tight ${sel ? "text-accent" : ""}`}>{d.label}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted">{d.suitedFor}</p>
                 </div>
               </button>
             );
           })}
         </div>
-      </div>
+      </fieldset>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <ColorPicker value={primaryColor} onChange={setPrimaryColor} label="Primærfarge" />
-        <ColorPicker value={secondaryColor} onChange={setSecondaryColor} label="Sekundærfarge" loadPriorColors={false} />
+        <ColorPicker
+          value={secondaryColor}
+          onChange={setSecondaryColor}
+          label="Sekundærfarge"
+          loadPriorColors={false}
+        />
       </div>
 
-      <div>
-        <p className="text-sm font-medium text-gray-700 mb-2">Bevegelse / motion</p>
-        <div className="grid grid-cols-3 gap-2">
-          {MOTION_OPTIONS.map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => setMotionPreference(o.id)}
-              className={`text-left px-3 py-2 rounded-lg border text-sm
-                ${motionPreference === o.id
-                  ? "border-blue-600 bg-blue-50 text-blue-700"
-                  : "border-gray-200 text-gray-700 hover:border-gray-300"}`}
-            >
-              <p className="font-medium">{o.label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{o.description}</p>
-            </button>
-          ))}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="edit_auth_type" className="field-label">
+            Autentisering
+          </label>
+          <select
+            id="edit_auth_type"
+            value={authType}
+            onChange={(e) => setAuthType(e.target.value)}
+            className="input"
+          >
+            {AUTH_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label} — {o.description}
+              </option>
+            ))}
+          </select>
         </div>
+
+        <fieldset>
+          <legend className="field-label">Bevegelse / motion</legend>
+          <div className="grid grid-cols-3 gap-2">
+            {MOTION_OPTIONS.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => setMotionPreference(o.id)}
+                aria-pressed={motionPreference === o.id}
+                title={o.description}
+                className="choice px-3 py-2 text-sm font-medium"
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
 
-      <div className="flex gap-3">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? "Lagrer..." : "Lagre"}
+      <div className="flex gap-2">
+        <button type="submit" disabled={saving} className="btn btn-primary">
+          {saving ? "Lagrer…" : "Lagre"}
         </button>
-        <button
-          onClick={onCancel}
-          disabled={saving}
-          className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-50"
-        >
+        <button type="button" onClick={onCancel} disabled={saving} className="btn btn-secondary">
           Avbryt
         </button>
       </div>
-    </div>
+    </form>
   );
 }

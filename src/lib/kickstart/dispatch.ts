@@ -20,8 +20,9 @@ function bypassHeader(): Record<string, string> {
  * cron-vaktposten plukker den opp. Men det er verdt en tydelig logglinje —
  * en kjede som aldri starter ser ellers ut som ingenting.
  */
-export async function triggerWorker(jobId: string): Promise<boolean> {
-  const url = `${siteUrl()}/api/kickstart/worker`;
+export async function triggerWorker(jobId: string, origin?: string): Promise<boolean> {
+  // origin kommer fra den innkommende forespørselen når vi har en — se siteUrl().
+  const url = `${origin ?? siteUrl()}/api/kickstart/worker`;
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -58,8 +59,10 @@ export async function triggerWorker(jobId: string): Promise<boolean> {
  * Brukes av helsesjekken, slik at en feilkonfigurert selv-URL oppdages med ett
  * klikk i stedet for ved at en generering aldri kommer i gang.
  */
-export async function probeSelfUrl(): Promise<{ url: string; reachable: boolean; status: number | null; hint?: string }> {
-  const url = siteUrl();
+export async function probeSelfUrl(
+  request?: { headers: Headers },
+): Promise<{ url: string; reachable: boolean; status: number | null; hint?: string }> {
+  const url = siteUrl(request);
   try {
     const res = await fetch(`${url}/login`, {
       method: "GET",

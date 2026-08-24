@@ -3,6 +3,7 @@ import { isTrustedWorkerRequest } from "@/lib/kickstart/worker-auth";
 import { listQueuedJobs } from "@/lib/kickstart/jobs";
 import { productionDeps, runNextPart } from "@/lib/kickstart/worker";
 import { triggerWorker } from "@/lib/kickstart/dispatch";
+import { siteUrl } from "@/lib/kickstart/base-url";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -32,15 +33,19 @@ export async function POST(req: NextRequest) {
   }
 
   const id = jobId;
+  // Kjedingen skal treffe samme domene som kalte oss — det er domenet vi vet
+  // fungerer, siden forespørselen kom inn på det.
+  const origin = siteUrl(req);
+
   after(async () => {
     const result = await runNextPart(id, productionDeps());
 
     if (result.outcome === "part_done") {
-      await triggerWorker(id);
+      await triggerWorker(id, origin);
     } else if (result.outcome === "retry") {
       // Kort pause så et umiddelbart gjentagende problem ikke blir en tett løkke.
       await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-      await triggerWorker(id);
+      await triggerWorker(id, origin);
     }
   });
 

@@ -3,6 +3,7 @@ import { createProject, getProject } from "@/lib/kickstart/queries";
 import { TOTAL_PARTS } from "@/lib/kickstart/generate";
 import { cancelActiveJobs, enqueueJob } from "@/lib/kickstart/jobs";
 import { triggerWorker } from "@/lib/kickstart/dispatch";
+import { siteUrl } from "@/lib/kickstart/base-url";
 import { wizardSchema } from "@/lib/kickstart/validation";
 import { WizardFormData } from "@/lib/kickstart/types";
 
@@ -69,8 +70,9 @@ export async function POST(req: NextRequest) {
       console.log(`[generate] Jobb ${job.id} lagt i kø fra del ${fromPart}`);
     }
 
-    // Starter første del nå. Feiler dette, tar cron-vaktposten jobben.
-    const started = await triggerWorker(job.id);
+    // Starter første del nå, på samme domene som nettleseren brukte hit.
+    // Feiler dette, tar cron-vaktposten jobben.
+    const started = await triggerWorker(job.id, siteUrl(req));
 
     return NextResponse.json({ project_id: projectId, job, started }, { status: 202 });
   } catch (e) {

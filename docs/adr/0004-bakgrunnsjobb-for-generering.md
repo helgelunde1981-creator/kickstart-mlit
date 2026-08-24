@@ -64,14 +64,22 @@ hyppige kjøringer (teamet er på Pro, så `*/5 * * * *` er greit; på Hobby vil
 det blitt én gang i døgnet). Worker-endepunktet må alltid være autentisert; det
 kan starte betalt arbeid.
 
-Og den lumske: **kjedingen går ut på nettet og inn igjen.** Prosjektet har
-Vercel Deployment Protection (SSO) på for alt unntatt egendefinerte domener, så
-treffer selvkallet et `.vercel.app`-domene, svarer Vercel med sin egen
-innloggingsside og jobben starter aldri. `NEXT_PUBLIC_SITE_URL` må derfor peke
-på `kickstart.mlit.no`. Kallet sender `x-vercel-protection-bypass` når Vercel har
-gitt oss en slik nøkkel, `triggerWorker` logger eksplisitt hva som er galt ved
-401/403, og `/api/kickstart/health` prøver selvkallet på ekte så feilen kan
-oppdages med ett klikk i stedet for ved at ingenting skjer.
+Og den lumske: **kjedingen går ut på nettet og inn igjen.** Første forsøk brukte
+`NEXT_PUBLIC_SITE_URL` med `VERCEL_URL` som reserve. I produksjon viste
+helsesjekken `http://localhost:3000`: variabelen var ikke satt, og Vercels
+system-variabler var ikke eksponert i runtime. Prosjektet har i tillegg
+Deployment Protection (SSO) på alt unntatt egendefinerte domener, så selv med
+`VERCEL_URL` ville kallet truffet et domene som svarer med Vercels
+innloggingsside.
+
+Løsningen er å ikke være avhengig av miljøet i det hele tatt: **selv-URL-en
+leses fra domenet forespørselen kom inn på**. Kommer brukeren fra
+`kickstart.mlit.no`, kaller vi oss selv der. I tillegg kjører cron-vaktposten en
+del *selv* i stedet for bare å ringe på — så selv om alle selvkall skulle bli
+blokkert, fullfører en spec seg med én del hvert femte minutt. `triggerWorker`
+sender `x-vercel-protection-bypass` når Vercel har gitt oss en slik nøkkel og
+logger eksplisitt ved 401/403, og `/api/kickstart/health` prøver selvkallet på
+ekte så feilen kan ses med ett klikk.
 
 ## Når bør dette tas opp igjen
 

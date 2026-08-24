@@ -80,9 +80,15 @@ koster maks én del. Worker-en svarer med en gang og gjør arbeidet i `after()`,
 så kjedingen mellom delene aldri holder en forbindelse åpen i minutter.
 
 Tre ting sikrer at løpet kommer i mål: kjedingen (rask, normalveien),
-cron-vaktposten hvert 5. minutt (fanger jobber som stoppet opp), og
-`attempts`-telleren som gir opp etter tre forsøk på samme del i stedet for å
-brenne penger i en løkke.
+cron-vaktposten hvert 5. minutt (fanger jobber som stoppet opp, og **kjører en
+del selv** hvis selvkallene ikke kommer fram — da fullfører en spec seg på en
+times tid uten at noe HTTP-kall mellom deler virker), og `attempts`-telleren som
+gir opp etter tre forsøk på samme del i stedet for å brenne penger i en løkke.
+
+Selv-URL-en hentes fra domenet forespørselen kom inn på. Det er med vilje:
+`VERCEL_URL` finnes bare når «Automatically expose System Environment Variables»
+er på, og `.vercel.app`-domenene her ligger bak Vercels SSO — begge deler ville
+gjort kjedingen avhengig av riktig oppsett i dashbordet.
 
 Standardene i `docs/standards/` er *inputen* til hver eneste del, og sendes med
 prompt caching (`cache_control`) slik at de ~40 000 tokenene betales fullt kun
@@ -131,7 +137,7 @@ advarselen i [AGENTS.md](./AGENTS.md).
 | `BOOTSTRAP_GITHUB_TOKEN`, `BOOTSTRAP_GITHUB_OWNER` | Ingen GitHub-repo i bootstrap |
 | `SUPABASE_MANAGEMENT_TOKEN`, `SUPABASE_ORG_ID` | Ingen Supabase-prosjekt i bootstrap |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | Ingen Vercel-prosjekt i bootstrap |
-| `NEXT_PUBLIC_SITE_URL` | **Viktig:** må peke på `https://kickstart.mlit.no`. Vercel Deployment Protection (SSO) er på for alle `.vercel.app`-domener, så et selvkall dit blir avvist og bakgrunnsjobben starter aldri. Sjekk med `/api/kickstart/health` |
+| `NEXT_PUBLIC_SITE_URL` | Appen leser domenet fra den innkommende forespørselen i stedet. Settes den, overstyrer den alt annet — nyttig hvis noe skal tvinges til ett bestemt domene |
 | `GENERATION_WORKER_SECRET` | Appen bruker `ADMIN_PASSWORD` når den kaller seg selv (worker/cron) |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Settes automatisk av Vercel hvis «Protection Bypass for Automation» er på — brukes som reserve når selvkallet treffer et beskyttet domene |
 | `CRON_SECRET` | Samme — settes den, brukes den også av Vercel Cron |

@@ -53,3 +53,42 @@ describe("triggerWorker", () => {
     delete process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
   });
 });
+
+describe("siteUrl", () => {
+  it("bruker domenet fra den innkommende forespørselen når env ikke er satt", async () => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    const { siteUrl } = await import("@/lib/kickstart/base-url");
+
+    const request = {
+      headers: new Headers({ host: "kickstart.mlit.no", "x-forwarded-proto": "https" }),
+    };
+    expect(siteUrl(request)).toBe("https://kickstart.mlit.no");
+
+    process.env.NEXT_PUBLIC_SITE_URL = "https://kickstart.mlit.no";
+  });
+
+  it("foretrekker x-forwarded-host bak proxy", async () => {
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    const { siteUrl } = await import("@/lib/kickstart/base-url");
+
+    const request = {
+      headers: new Headers({
+        host: "intern-vercel-host.vercel.app",
+        "x-forwarded-host": "kickstart.mlit.no",
+        "x-forwarded-proto": "https",
+      }),
+    };
+    expect(siteUrl(request)).toBe("https://kickstart.mlit.no");
+
+    process.env.NEXT_PUBLIC_SITE_URL = "https://kickstart.mlit.no";
+  });
+
+  it("lar eksplisitt NEXT_PUBLIC_SITE_URL vinne over forespørselen", async () => {
+    process.env.NEXT_PUBLIC_SITE_URL = "https://eksplisitt.example";
+    const { siteUrl } = await import("@/lib/kickstart/base-url");
+
+    expect(siteUrl({ headers: new Headers({ host: "noe-annet.no" }) })).toBe("https://eksplisitt.example");
+
+    process.env.NEXT_PUBLIC_SITE_URL = "https://kickstart.mlit.no";
+  });
+});

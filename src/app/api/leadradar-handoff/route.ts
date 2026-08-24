@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   try {
     const project = await createProject(body);
     const { job } = await enqueueJob(project.id, 1, TOTAL_PARTS);
-    await triggerWorker(job.id);
+    await triggerWorker(job.id, siteUrl(req));
 
     console.log(
       `[leadradar-handoff] Prosjekt ${project.id} opprettet for "${body.client_name}", jobb ${job.id} i kø`,
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       project_id: project.id,
-      project_url: `${siteUrl()}/admin/kickstart/${project.id}`,
+      project_url: `${siteUrl(req)}/admin/kickstart/${project.id}`,
       job_id: job.id,
       status: "queued",
     });

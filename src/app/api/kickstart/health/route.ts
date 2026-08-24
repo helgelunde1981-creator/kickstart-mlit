@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { missingStandardsFiles } from "@/lib/kickstart/standards";
 import { CLAUDE_MODEL } from "@/lib/kickstart/model";
 import { probeSelfUrl } from "@/lib/kickstart/dispatch";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * som tar 15 minutter og koster penger. Bak admin-cookien (proxy.ts matcher
  * /api/kickstart/*), så den lekker ingenting.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const missing = missingStandardsFiles();
   const env = {
     ANTHROPIC_API_KEY: Boolean(process.env.ANTHROPIC_API_KEY),
@@ -27,7 +27,7 @@ export async function GET() {
   };
 
   // Bakgrunnsgenereringen står og faller på at appen når seg selv.
-  const self = await probeSelfUrl();
+  const self = await probeSelfUrl(req);
 
   // Kun det som må være på plass for kjerneflyten avgjør ok/ikke ok.
   const required = [

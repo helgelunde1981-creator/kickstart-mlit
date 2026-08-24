@@ -1,89 +1,119 @@
+const GITHUB_API = "https://api.github.com";
+
+function token(): string {
+  const value = process.env.BOOTSTRAP_GITHUB_TOKEN;
+  if (!value) throw new Error("BOOTSTRAP_GITHUB_TOKEN mangler i miljøet");
+  return value;
+}
+
+function owner(): string {
+  return process.env.BOOTSTRAP_GITHUB_OWNER || "helgelunde1981-creator";
+}
+
+function headers(): HeadersInit {
+  return {
+    Authorization: `Bearer ${token()}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "Content-Type": "application/json",
+  };
+}
+
+export function repoSlug(projectName: string): string {
+  const slug = projectName
+    .toLowerCase()
+    .replace(/[æå]/g, "a")
+    .replace(/ø/g, "o")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  if (!slug) throw new Error(`Klarte ikke lage repo-navn av "${projectName}"`);
+  return slug;
+}
+
+/** GitHub svarer med JSON-feil og status 200-ish i noen tilfeller — les alltid kroppen. */
+async function githubError(res: Response, context: string): Promise<Error> {
+  const text = await res.text();
+  let message = text.slice(0, 300);
+  try {
+    const json = JSON.parse(text) as { message?: string; errors?: { message?: string }[] };
+    message = [json.message, ...(json.errors ?? []).map((e) => e.message)].filter(Boolean).join(" — ");
+  } catch {
+    /* behold rå tekst */
+  }
+  return new Error(`${context} (HTTP ${res.status}): ${message}`);
+}
+
+export interface RepoFile {
+  path: string;
+  content: string;
+}
+
 export async function createGitHubRepo(
   projectName: string,
   description: string,
-  projectMd: string
+  files: RepoFile[],
 ): Promise<string> {
-  const token = process.env.BOOTSTRAP_GITHUB_TOKEN!;
-  const owner = "helgelunde1981-creator";
-  const repoName = projectName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const repoName = repoSlug(projectName);
 
-  const createRes = await fetch("https://api.github.com/user/repos", {
+  const createRes = await fetch(`${GITHUB_API}/user/repos`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      name: repoName,
-      description,
-      private: true,
-      auto_init: true,
-    }),
+    headers: headers(),
+    body: JSON.stringify({ name: repoName, description, private: true, auto_init: true }),
   });
 
-  if (!createRes.ok) {
-    const err = await createRes.json();
-    // Repo finnes allerede — bruk det eksisterende
-    if (createRes.status === 422) {
-      const existing = await fetch(`https://api.github.com/repos/${owner}/${repoName}`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-      });
-      if (existing.ok) {
-        const existingRepo = await existing.json();
-        await addFileToRepo(token, owner, repoName, "PROJECT.md", projectMd);
-        return existingRepo.html_url;
-      }
-    }
-    throw new Error(`GitHub repo-oppretting feilet: ${err.message}`);
+  let htmlUrl: string;
+  if (createRes.ok) {
+    htmlUrl = ((await createRes.json()) as { html_url: string }).html_url;
+  } else if (createRes.status === 422) {
+    // Repoet finnes allerede — bruk det framfor å stoppe hele bootstrappen.
+    const existing = await fetch(`${GITHUB_API}/repos/${owner()}/${repoName}`, { headers: headers() });
+    if (!existing.ok) throw await githubError(createRes, "GitHub repo-oppretting feilet");
+    htmlUrl = ((await existing.json()) as { html_url: string }).html_url;
+  } else {
+    throw await githubError(createRes, "GitHub repo-oppretting feilet");
   }
 
-  const repo = await createRes.json();
-
-  await addFileToRepo(token, owner, repoName, "PROJECT.md", projectMd);
-
-  return repo.html_url;
+  for (const file of files) {
+    await putFile(owner(), repoName, file);
+  }
+  return htmlUrl;
 }
 
 export async function updateProjectMdInGitHub(repoUrl: string, projectMd: string): Promise<void> {
-  const token = process.env.BOOTSTRAP_GITHUB_TOKEN;
-  if (!token) return;
   const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
-  if (!match) return;
-  const [, owner, repo] = match;
-  await addFileToRepo(token, owner, repo.replace(/\.git$/, ""), "PROJECT.md", projectMd);
+  if (!match) throw new Error(`Klarte ikke lese eier/repo ut av "${repoUrl}"`);
+  const [, repoOwner, repo] = match;
+  await putFile(repoOwner, repo.replace(/\.git$/, ""), { path: "PROJECT.md", content: projectMd });
 }
 
-async function addFileToRepo(
-  token: string,
-  owner: string,
-  repo: string,
-  path: string,
-  content: string
-): Promise<void> {
-  await new Promise((r) => setTimeout(r, 1500));
+/**
+ * Skriver (eller oppdaterer) én fil. Tidligere ble responsen på PUT ignorert —
+ * en feilet push så nøyaktig ut som en vellykket i loggen.
+ */
+async function putFile(repoOwner: string, repo: string, file: RepoFile): Promise<void> {
+  const url = `${GITHUB_API}/repos/${repoOwner}/${repo}/contents/${file.path}`;
 
-  const getRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-  });
+  // auto_init tar et lite øyeblikk før default-branchen finnes.
+  await new Promise((r) => setTimeout(r, 1200));
 
+  const getRes = await fetch(url, { headers: headers() });
   let sha: string | undefined;
   if (getRes.ok) {
-    const existing = await getRes.json();
-    sha = existing.sha;
+    sha = ((await getRes.json()) as { sha?: string }).sha;
+  } else if (getRes.status !== 404) {
+    throw await githubError(getRes, `Kunne ikke lese ${file.path} fra GitHub`);
   }
 
-  await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+  const putRes = await fetch(url, {
     method: "PUT",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "Content-Type": "application/json",
-    },
+    headers: headers(),
     body: JSON.stringify({
-      message: "chore: add PROJECT.md from kickstart-mlit",
-      content: Buffer.from(content).toString("base64"),
+      message: sha ? `chore: oppdater ${file.path} fra kickstart-mlit` : `chore: legg til ${file.path} fra kickstart-mlit`,
+      content: Buffer.from(file.content, "utf-8").toString("base64"),
       ...(sha ? { sha } : {}),
     }),
   });
+  if (!putRes.ok) throw await githubError(putRes, `Kunne ikke skrive ${file.path} til GitHub`);
 }

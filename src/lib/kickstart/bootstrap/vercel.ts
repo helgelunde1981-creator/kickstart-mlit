@@ -2,8 +2,10 @@ export async function createVercelProject(
   projectName: string,
   githubRepoUrl?: string
 ): Promise<string> {
-  const token = process.env.VERCEL_TOKEN!;
-  const teamId = process.env.VERCEL_TEAM_ID!;
+  const token = process.env.VERCEL_TOKEN;
+  const teamId = process.env.VERCEL_TEAM_ID;
+  if (!token) throw new Error("VERCEL_TOKEN mangler i miljøet");
+  if (!teamId) throw new Error("VERCEL_TEAM_ID mangler i miljøet");
 
   const slug = projectName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 

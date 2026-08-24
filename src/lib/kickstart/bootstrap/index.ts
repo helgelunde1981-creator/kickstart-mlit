@@ -1,8 +1,9 @@
 import { KickstartProject, BootstrapResult } from "../types";
-import { createGitHubRepo } from "./github";
+import { createGitHubRepo, RepoFile } from "./github";
 import { createSupabaseProject } from "./supabase";
 import { createVercelProject } from "./vercel";
 import { updateProjectBootstrap } from "../queries";
+import { buildAgentsMd, buildRepoReadme } from "./repo-files";
 
 export type BootstrapStep = (msg: string) => void;
 
@@ -24,12 +25,19 @@ export async function bootstrapProject(
   } else {
     try {
       onStep("Oppretter GitHub-repo...");
+      // Et repo med kun PROJECT.md er halvferdig: neste AI-økt trenger AGENTS.md
+      // for å vite hvilke regler som gjelder, og et menneske trenger en README.
+      const files: RepoFile[] = [
+        { path: "PROJECT.md", content: project.project_md },
+        { path: "AGENTS.md", content: buildAgentsMd(project) },
+        { path: "README.md", content: buildRepoReadme(project) },
+      ];
       result.github_repo_url = await createGitHubRepo(
         project.project_name,
         project.short_description ?? "",
-        project.project_md
+        files,
       );
-      onStep(`GitHub-repo opprettet: ${result.github_repo_url}`);
+      onStep(`GitHub-repo opprettet med PROJECT.md, AGENTS.md og README.md: ${result.github_repo_url}`);
     } catch (e) {
       result.errors.push(`GitHub: ${(e as Error).message}`);
     }
@@ -42,8 +50,13 @@ export async function bootstrapProject(
   } else {
     try {
       onStep("Oppretter Supabase-prosjekt...");
-      result.supabase_project_ref = await createSupabaseProject(project.project_name);
-      onStep(`Supabase-prosjekt opprettet: ${result.supabase_project_ref}`);
+      const supabase = await createSupabaseProject(project.project_name);
+      result.supabase_project_ref = supabase.ref;
+      result.supabase_db_password = supabase.dbPassword;
+      onStep(`Supabase-prosjekt opprettet: ${supabase.ref}`);
+      onStep(
+        `DB-passord (vises kun nå — legg det i Doppler før du lukker vinduet): ${supabase.dbPassword}`,
+      );
     } catch (e) {
       result.errors.push(`Supabase: ${(e as Error).message}`);
     }
@@ -66,14 +79,16 @@ export async function bootstrapProject(
     }
   }
 
-  // Persist — kun felt som faktisk har verdi
+  // Persist — kun felt som faktisk har verdi. Passordet lagres bevisst ikke.
   try {
     const updateData = {
       ...(result.github_repo_url    && { github_repo_url: result.github_repo_url }),
       ...(result.supabase_project_ref && { supabase_project_ref: result.supabase_project_ref }),
       ...(result.vercel_project_id  && { vercel_project_id: result.vercel_project_id }),
     };
-    await updateProjectBootstrap(project.id, updateData);
+    if (Object.keys(updateData).length > 0) {
+      await updateProjectBootstrap(project.id, updateData);
+    }
   } catch (e) {
     result.errors.push(`DB-oppdatering: ${(e as Error).message}`);
   }

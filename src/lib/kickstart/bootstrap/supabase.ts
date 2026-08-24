@@ -1,9 +1,23 @@
+import { randomBytes } from "crypto";
+
+export interface SupabaseBootstrap {
+  ref: string;
+  /**
+   * Databasepassordet vises ÉN gang i bootstrap-loggen og lagres bevisst ikke i
+   * kickstart-databasen. Tidligere ble det generert og kastet — prosjektet ble
+   * opprettet med et passord ingen hadde.
+   */
+  dbPassword: string;
+}
+
 export async function createSupabaseProject(
   projectName: string,
   region = "eu-central-1"
-): Promise<string> {
-  const token = process.env.SUPABASE_MANAGEMENT_TOKEN!;
-  const orgId = process.env.SUPABASE_ORG_ID!;
+): Promise<SupabaseBootstrap> {
+  const token = process.env.SUPABASE_MANAGEMENT_TOKEN;
+  const orgId = process.env.SUPABASE_ORG_ID;
+  if (!token) throw new Error("SUPABASE_MANAGEMENT_TOKEN mangler i miljøet");
+  if (!orgId) throw new Error("SUPABASE_ORG_ID mangler i miljøet");
 
   const dbPassword = generatePassword();
   const slug = projectName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
@@ -24,15 +38,20 @@ export async function createSupabaseProject(
   });
 
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(`Supabase prosjektoppretting feilet: ${JSON.stringify(err)}`);
+    const err = await res.text();
+    throw new Error(`Supabase prosjektoppretting feilet (HTTP ${res.status}): ${err.slice(0, 300)}`);
   }
 
-  const project = await res.json();
-  return project.id;
+  const project = (await res.json()) as { id: string };
+  return { ref: project.id, dbPassword };
 }
 
+/**
+ * crypto.randomBytes, ikke Math.random — dette passordet beskytter en
+ * produksjonsdatabase.
+ */
 function generatePassword(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%";
-  return Array.from({ length: 24 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+  const bytes = randomBytes(32);
+  return Array.from(bytes, (b) => chars[b % chars.length]).join("");
 }

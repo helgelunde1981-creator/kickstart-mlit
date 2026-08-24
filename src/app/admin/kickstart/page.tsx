@@ -1,102 +1,84 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { listProjects } from "@/lib/kickstart/queries";
-import { KickstartProject } from "@/lib/kickstart/types";
+import ProjectList, { ProjectRow } from "@/components/kickstart/ProjectList";
+import { TOTAL_PARTS } from "@/lib/kickstart/generate";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Prosjekter" };
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Utkast",
-  generated: "Generert",
-  bootstrapped: "Bootstrapped",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-yellow-100 text-yellow-800",
-  generated: "bg-blue-100 text-blue-800",
-  bootstrapped: "bg-green-100 text-green-800",
-};
-
+/** Formateres på serveren med fast tidssone — ellers spriker server og klient. */
 function formatNorwegianTime(iso: string): string {
   const d = new Date(iso);
-  const date = d.toLocaleDateString("nb-NO", { day: "2-digit", month: "2-digit", year: "numeric" });
-  const time = d.toLocaleTimeString("nb-NO", { hour: "2-digit", minute: "2-digit" });
+  const date = d.toLocaleDateString("nb-NO", {
+    day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Oslo",
+  });
+  const time = d.toLocaleTimeString("nb-NO", {
+    hour: "2-digit", minute: "2-digit", timeZone: "Europe/Oslo",
+  });
   return `${date} kl. ${time}`;
 }
 
 export default async function KickstartListPage() {
-  let projects: KickstartProject[] = [];
+  let rows: ProjectRow[];
   try {
-    projects = await listProjects();
-  } catch {
-    return <div className="text-red-500">Kunne ikke laste prosjekter</div>;
+    const projects = await listProjects();
+    rows = projects.map((p) => ({
+      id: p.id,
+      project_name: p.project_name,
+      client_name: p.client_name,
+      short_description: p.short_description,
+      status: p.status,
+      primary_color: p.primary_color,
+      created_at: p.created_at,
+      created_at_label: formatNorwegianTime(p.created_at),
+      generated_parts: p.generated_parts ?? 0,
+      total_parts: TOTAL_PARTS,
+    }));
+  } catch (e) {
+    return (
+      <div className="card p-6">
+        <h1 className="mb-2 text-lg font-semibold">Kunne ikke laste prosjekter</h1>
+        <p className="text-sm text-muted">
+          Databasen svarte ikke: {(e as Error).message}
+        </p>
+        <p className="mt-3 text-sm text-muted">
+          Sjekk <code className="font-mono text-xs">/api/kickstart/health</code> for hvilke
+          miljøvariabler som mangler.
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Kickstart-prosjekter</h1>
-        <Link
-          href="/admin/kickstart/ny"
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          + Nytt prosjekt
+    <>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Kickstart-prosjekter</h1>
+          <p className="text-sm text-muted">
+            {rows.length === 0
+              ? "Ingen prosjekter ennå"
+              : `${rows.length} ${rows.length === 1 ? "prosjekt" : "prosjekter"}`}
+          </p>
+        </div>
+        <Link href="/admin/kickstart/ny" className="btn btn-primary">
+          Nytt prosjekt
         </Link>
       </div>
 
-      {projects.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
-          <p className="text-gray-500 mb-4">Ingen prosjekter ennå</p>
-          <Link
-            href="/admin/kickstart/ny"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
-          >
+      {rows.length === 0 ? (
+        <div className="card p-10 text-center">
+          <p className="mb-1 font-medium">Ingen prosjekter ennå</p>
+          <p className="mb-5 text-sm text-muted">
+            Et prosjekt tar deg gjennom ni steg og ender i en komplett PROJECT.md.
+          </p>
+          <Link href="/admin/kickstart/ny" className="btn btn-primary">
             Opprett ditt første prosjekt
           </Link>
         </div>
       ) : (
-        <div className="space-y-3">
-          {projects.map((p, idx) => (
-            <Link
-              key={p.id}
-              href={`/admin/kickstart/${p.id}`}
-              className={`block bg-white border rounded-xl p-4 hover:shadow-sm transition-all
-                ${idx === 0 ? "border-blue-400 ring-1 ring-blue-200" : "border-gray-200 hover:border-blue-300"}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    {idx === 0 && (
-                      <span className="text-xs font-semibold bg-blue-600 text-white px-2 py-0.5 rounded-full">
-                        SIST
-                      </span>
-                    )}
-                    {p.primary_color && (
-                      <span
-                        className="w-3 h-3 rounded-full inline-block shrink-0"
-                        style={{ backgroundColor: p.primary_color }}
-                      />
-                    )}
-                    <span className="font-medium text-gray-900">{p.project_name}</span>
-                    <span className="text-gray-400 text-sm">·</span>
-                    <span className="text-gray-500 text-sm">{p.client_name}</span>
-                  </div>
-                  {p.short_description && (
-                    <p className="text-sm text-gray-500 truncate">{p.short_description}</p>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${STATUS_COLORS[p.status] ?? "bg-gray-100 text-gray-600"}`}>
-                    {STATUS_LABELS[p.status] ?? p.status}
-                  </span>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {formatNorwegianTime(p.created_at)}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <ProjectList projects={rows} />
       )}
-    </div>
+    </>
   );
 }

@@ -132,7 +132,7 @@ export const DESIGN_DIRECTIONS: DesignDirection[] = [
 
 export const MOTION_OPTIONS = [
   { id: "livlig",  label: "Livlig",  description: "Scroll-animasjoner, parallax, signature moments med bevegelse" },
-  { id: "subtil",  label: "Subtil",  description: "Diskrete hover-states, smooth transitions, minimal distrakksjon" },
+  { id: "subtil",  label: "Subtil",  description: "Diskrete hover-states, smooth transitions, minimal distraksjon" },
   { id: "ingen",   label: "Ingen",   description: "Statisk — ingen animasjoner utover nødvendige UI-states" },
 ];
 

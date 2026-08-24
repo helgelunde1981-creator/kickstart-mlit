@@ -31,6 +31,8 @@ export interface KickstartProject {
   vercel_project_id: string | null;
   step_completed: number;
   mockup_images: string[];
+  /** Hvor mange av de 12 delene som er ferdig generert og lagret. */
+  generated_parts: number | null;
 }
 
 export interface PriceEstimate {
@@ -96,18 +98,31 @@ export interface DesignDirection {
 export interface BootstrapResult {
   github_repo_url?: string;
   supabase_project_ref?: string;
+  /** Vises én gang i UI-et og lagres aldri i databasen. */
+  supabase_db_password?: string;
   vercel_project_id?: string;
   errors: string[];
 }
 
 export type VerifyCheck = { label: string; ok: boolean };
 
+export interface PartUsage {
+  /** Tokens som ble lest fra prompt-cachen — 0 over tid betyr at cachen ikke treffer. */
+  cached_input_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+}
+
 export type StreamEvent =
-  | { type: "start_part"; part: number; title: string }
+  | { type: "project_id"; id: string }
+  | { type: "start_part"; part: number; total: number; title: string }
+  | { type: "restart_part"; part: number; attempt: number; reason: string }
   | { type: "delta"; text: string }
-  | { type: "part"; part: number; title: string; content: string }
+  | { type: "part"; part: number; total: number; title: string; content: string; usage?: PartUsage }
   | { type: "continue"; project_id: string; next_part: number }
   | { type: "verify"; ok: boolean; checks: VerifyCheck[] }
+  | { type: "github_updated"; url: string }
+  | { type: "warning"; message: string }
   | { type: "done"; project_md: string }
   | { type: "error"; message: string };
 

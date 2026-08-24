@@ -5,10 +5,46 @@ import { DESIGN_DIRECTIONS, PROJECT_TYPES, MOTION_OPTIONS, AUTH_OPTIONS, TECH_OP
 
 const STANDARDS_DIR = path.join(process.cwd(), "docs", "standards");
 
+/**
+ * Standardene er ~40 000 tokens som leses for hver eneste del. Les dem én gang
+ * per lambda-instans.
+ */
+const fileCache = new Map<string, string>();
+
+/**
+ * Filene MÅ være med i serverless-bunten (se outputFileTracingIncludes i
+ * next.config.ts). Mangler de, blir specen generert uten MLIT-standardene —
+ * det ser ut som en vellykket kjøring, men leveransen er en helt annen vare.
+ * Derfor kaster vi framfor å degradere stille.
+ */
 function readStandardsFile(filename: string): string {
+  const cached = fileCache.get(filename);
+  if (cached !== undefined) return cached;
+
   const filePath = path.join(STANDARDS_DIR, filename);
-  if (!fs.existsSync(filePath)) return "";
-  return fs.readFileSync(filePath, "utf-8");
+  if (!fs.existsSync(filePath)) {
+    throw new Error(
+      `Standardfilen docs/standards/${filename} finnes ikke på serveren. ` +
+        "Uten den blir specen generert uten MLIT-standardene. Sjekk outputFileTracingIncludes i next.config.ts.",
+    );
+  }
+  const content = fs.readFileSync(filePath, "utf-8");
+  fileCache.set(filename, content);
+  return content;
+}
+
+export const STANDARDS_FILES = [
+  "00-SYSTEM_PROMPT.md",
+  "01-SPEC_TEMPLATE.md",
+  "02-DESIGN_DIRECTIONS.md",
+  "03-TECH_STACK_CANON.md",
+  "04-QUALITY_GATES.md",
+  "05-BRAND_VOICE.md",
+] as const;
+
+/** Brukes av helsesjekken i /api/kickstart/health. */
+export function missingStandardsFiles(): string[] {
+  return STANDARDS_FILES.filter((f) => !fs.existsSync(path.join(STANDARDS_DIR, f)));
 }
 
 export function getSystemPrompt(): string {
@@ -80,31 +116,31 @@ Disse filene definerer EKSAKT hva du skal levere. Les dem nøye:
 
 ## Spec-template (følg denne strukturen slavisk)
 
-${specTemplate || "MERK: 01-SPEC_TEMPLATE.md ikke funnet i docs/standards/ — bruk 20-seksjon-strukturen fra system-prompt."}
+${specTemplate}
 
 ---
 
 ## Designretninger (02-DESIGN_DIRECTIONS.md)
 
-${designGuide || "Se system-prompt for designretnings-beskrivelser."}
+${designGuide}
 
 ---
 
 ## Tech Stack Canon (03-TECH_STACK_CANON.md)
 
-${techCanon || "Bruk default-stacken fra system-prompt."}
+${techCanon}
 
 ---
 
 ## Quality Gates — 10/10-definisjon (04-QUALITY_GATES.md)
 
-${qualityGates || "Se quality-gates i system-prompt."}
+${qualityGates}
 
 ---
 
 ## Brand Voice (05-BRAND_VOICE.md)
 
-${brandVoice || "Se brand-voice-regler i system-prompt."}
+${brandVoice}
 
 ---
 

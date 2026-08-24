@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createProject, savePartialMd } from "@/lib/kickstart/queries";
 import { streamPart } from "@/lib/kickstart/generate";
-import { WizardFormData } from "@/lib/kickstart/types";
+import { safeEqual } from "@/lib/auth/session";
+import { handoffSchema, toWizardFormData } from "@/lib/kickstart/validation";
 
 // Dedikert intake-endepunkt for LeadRadar (2026-07-20) — bevisst separat fra
 // /api/kickstart/stream sin admin_session-cookie-gate. LeadRadar skal ALDRI
@@ -22,21 +23,28 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
-  const auth = req.headers.get("authorization");
-  if (!process.env.LEADRADAR_HANDOFF_SECRET || auth !== `Bearer ${process.env.LEADRADAR_HANDOFF_SECRET}`) {
+  const secret = process.env.LEADRADAR_HANDOFF_SECRET;
+  const auth = req.headers.get("authorization") ?? "";
+  if (!secret || !safeEqual(auth, `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: WizardFormData;
-  try {
-    body = await req.json();
-  } catch {
+  const raw = await req.json().catch(() => null);
+  if (raw === null) {
     return NextResponse.json({ error: "Ugyldig JSON" }, { status: 400 });
   }
 
-  if (!body.client_name || !body.project_name) {
-    return NextResponse.json({ error: "client_name og project_name er påkrevd" }, { status: 400 });
+  // LeadRadar er en annen app med sitt eget tempo — den sender ikke
+  // nødvendigvis alle felter. Skjemaet fyller inn defaults i stedet for å la
+  // undefined havne i databasen.
+  const parsed = handoffSchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Ugyldige felter", details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) },
+      { status: 400 },
+    );
   }
+  const body = toWizardFormData(parsed.data);
 
   try {
     const project = await createProject(body);
@@ -46,7 +54,10 @@ export async function POST(req: NextRequest) {
     for await (const event of streamPart(body, 0, "")) {
       if (event.type === "part") part1Content = event.content;
     }
-    await savePartialMd(project.id, part1Content);
+    if (!part1Content.trim()) {
+      throw new Error("Del 1 kom tom tilbake fra modellen");
+    }
+    await savePartialMd(project.id, part1Content, 1);
     console.log(`[leadradar-handoff] Del 1/12 lagret — ${part1Content.length} tegn`);
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.startsWith("http")

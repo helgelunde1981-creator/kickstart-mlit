@@ -21,10 +21,17 @@ Ingen commit med røde sjekker.
 
 ## Før du melder ferdig
 
-- [ ] typecheck (`pnpm exec tsc --noEmit`) grønn
+`pnpm check` kjører de tre første i ett:
+
+- [ ] typecheck (`pnpm typecheck`) grønn
 - [ ] lint (`pnpm lint`) grønn
-- [ ] bygg (`pnpm build`) grønn
+- [ ] tester (`pnpm test`) grønne
+- [ ] bygg (`pnpm build`) grønt
 - [ ] Ingen hemmeligheter i diffen
+- [ ] Skjemaendring? Migrasjon lagt i `supabase/migrations/`
+
+De samme sjekkene kjører i CI (`.github/workflows/ci.yml`) på hver PR — men
+finn feilene lokalt, ikke i en rød pipeline.
 
 Feiler noe du ikke klarer å fikse: si det rett ut, med utdata. Ikke rapporter
 ferdig med røde tester, og aldri basert på kodelesing alene.

@@ -6,8 +6,8 @@
 
 ## Sjekkliste
 
-- [ ] typecheck (`pnpm exec tsc --noEmit`) grønn
-- [ ] lint (`pnpm lint`) grønn
-- [ ] bygg (`pnpm build`) grønn
+- [ ] `pnpm check` (typecheck + lint + test) grønn
+- [ ] bygg (`pnpm build`) grønt
 - [ ] Ingen hemmeligheter i diffen
+- [ ] Skjemaendring? Migrasjon lagt i `supabase/migrations/`
 - [ ] ADR skrevet hvis dette er en beslutning andre må forholde seg til

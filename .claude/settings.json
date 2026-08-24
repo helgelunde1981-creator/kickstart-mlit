@@ -5,7 +5,11 @@
       "Bash(pnpm build*)",
       "Bash(pnpm lint*)",
       "Bash(pnpm start*)",
-      "Bash(pnpm exec tsc --noEmit*)"
+      "Bash(pnpm typecheck*)",
+      "Bash(pnpm test*)",
+      "Bash(pnpm check*)",
+      "Bash(pnpm exec tsc --noEmit*)",
+      "Bash(pnpm exec vitest*)"
     ],
     "additionalDirectories": []
   }

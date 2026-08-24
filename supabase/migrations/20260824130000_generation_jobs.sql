@@ -34,10 +34,10 @@ create unique index if not exists kickstart_generation_jobs_one_active
 create index if not exists kickstart_generation_jobs_status_idx
   on public.kickstart_generation_jobs (status, updated_at);
 
-drop trigger if exists kickstart_generation_jobs_set_updated_at on public.kickstart_generation_jobs;
-create trigger kickstart_generation_jobs_set_updated_at
+drop trigger if exists kickstart_generation_jobs_updated_at on public.kickstart_generation_jobs;
+create trigger kickstart_generation_jobs_updated_at
   before update on public.kickstart_generation_jobs
-  for each row execute function public.set_updated_at();
+  for each row execute function public.update_updated_at();
 
 alter table public.kickstart_generation_jobs enable row level security;
 
@@ -47,6 +47,8 @@ create or replace function public.kickstart_project_tail(p_id uuid, p_len intege
 returns table (tail text, total_chars integer)
 language sql
 stable
+security invoker
+set search_path = ''
 as $$
   select right(coalesce(project_md, ''), p_len), length(coalesce(project_md, ''))
   from public.kickstart_projects

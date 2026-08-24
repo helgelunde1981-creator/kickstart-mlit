@@ -24,6 +24,10 @@ export async function GET(req: NextRequest) {
     SUPABASE_MANAGEMENT_TOKEN: Boolean(process.env.SUPABASE_MANAGEMENT_TOKEN),
     VERCEL_TOKEN: Boolean(process.env.VERCEL_TOKEN),
     LEADRADAR_HANDOFF_SECRET: Boolean(process.env.LEADRADAR_HANDOFF_SECRET),
+    // Ikke påkrevd: uten disse brukes ADMIN_PASSWORD mot oss selv, og cron
+    // slipper inn på Vercels egen x-vercel-cron-header.
+    CRON_SECRET: Boolean(process.env.CRON_SECRET),
+    GENERATION_WORKER_SECRET: Boolean(process.env.GENERATION_WORKER_SECRET),
   };
 
   // Bakgrunnsgenereringen står og faller på at appen når seg selv.

@@ -20,6 +20,20 @@ export function workerAuthHeader(): Record<string, string> {
   return { Authorization: `Bearer ${workerSecret()}` };
 }
 
+/**
+ * Vercel Cron legger på `Authorization: Bearer $CRON_SECRET` KUN hvis den
+ * variabelen er satt. Er den ikke det, kommer cron-kallet uten autentisering i
+ * det hele tatt — og vaktposten ville svart 401 på sin egen planlagte kjøring.
+ *
+ * Vercel merker sine cron-kall med denne headeren. Vi godtar den for
+ * cron-ruta alene: det verste noen kan oppnå med et forfalsket kall er å
+ * fremskynde arbeid som allerede ligger i kø og er betalt for — den kan verken
+ * opprette jobber eller lese data.
+ */
+export function isVercelCron(request: Request): boolean {
+  return request.headers.get("x-vercel-cron") !== null;
+}
+
 /** Vercel Cron sender CRON_SECRET som bearer-token; worker-kall sender vår egen. */
 export function isTrustedWorkerRequest(request: Request): boolean {
   const header = request.headers.get("authorization") ?? "";

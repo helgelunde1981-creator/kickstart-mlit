@@ -92,3 +92,20 @@ describe("siteUrl", () => {
     process.env.NEXT_PUBLIC_SITE_URL = "https://kickstart.mlit.no";
   });
 });
+
+describe("cron-autentisering", () => {
+  it("godtar Vercels cron-header når CRON_SECRET ikke er satt", async () => {
+    // Uten dette ville Vercels egen planlagte kjøring fått 401 av oss, og
+    // vaktposten vært død uten at noe sa fra.
+    const { isVercelCron, isTrustedWorkerRequest } = await import("@/lib/kickstart/worker-auth");
+
+    const cronKall = new Request("https://kickstart.mlit.no/api/kickstart/cron", {
+      headers: { "x-vercel-cron": "1" },
+    });
+    expect(isVercelCron(cronKall)).toBe(true);
+    expect(isTrustedWorkerRequest(cronKall)).toBe(false);
+
+    const vanligKall = new Request("https://kickstart.mlit.no/api/kickstart/cron");
+    expect(isVercelCron(vanligKall)).toBe(false);
+  });
+});

@@ -140,7 +140,7 @@ advarselen i [AGENTS.md](./AGENTS.md).
 | `NEXT_PUBLIC_SITE_URL` | Appen leser domenet fra den innkommende forespørselen i stedet. Settes den, overstyrer den alt annet — nyttig hvis noe skal tvinges til ett bestemt domene |
 | `GENERATION_WORKER_SECRET` | Appen bruker `ADMIN_PASSWORD` når den kaller seg selv (worker/cron) |
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | Settes automatisk av Vercel hvis «Protection Bypass for Automation» er på — brukes som reserve når selvkallet treffer et beskyttet domene |
-| `CRON_SECRET` | Samme — settes den, brukes den også av Vercel Cron |
+| `CRON_SECRET` | Cron slipper inn på Vercels egen `x-vercel-cron`-header. Settes den, sender Vercel den i tillegg som bearer-token — anbefalt, men ikke påkrevd |
 | `LEADRADAR_HANDOFF_SECRET` | `/api/leadradar-handoff` svarer 401 på alt |
 | `NEXT_PUBLIC_SITE_URL` | LeadRadar får `https://kickstart.mlit.no` som lenkebase |
 

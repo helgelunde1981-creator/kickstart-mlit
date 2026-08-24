@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { isTrustedWorkerRequest } from "@/lib/kickstart/worker-auth";
+import { isTrustedWorkerRequest, isVercelCron } from "@/lib/kickstart/worker-auth";
 import { listQueuedJobs, recoverStaleJobs } from "@/lib/kickstart/jobs";
 import { triggerWorker } from "@/lib/kickstart/dispatch";
 import { productionDeps, runNextPart } from "@/lib/kickstart/worker";
@@ -26,7 +26,9 @@ export const dynamic = "force-dynamic";
  * worker-hemmeligheten hvis noe henger.
  */
 export async function GET(req: NextRequest) {
-  if (!isTrustedWorkerRequest(req)) {
+  // Enten vår egen hemmelighet, eller Vercels egen cron-header (som er det
+  // eneste vi får når CRON_SECRET ikke er satt).
+  if (!isTrustedWorkerRequest(req) && !isVercelCron(req)) {
     return NextResponse.json({ error: "Ikke autorisert" }, { status: 401 });
   }
 

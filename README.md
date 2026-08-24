@@ -32,6 +32,9 @@ doppler run -- pnpm dev          # http://localhost:3000
 | `pnpm test` | Vitest (enhetstester) |
 | `pnpm check` | Typecheck + lint + test — kjør denne før du melder ferdig |
 
+CI-workflowen ligger i [`docs/ci/`](./docs/ci/) og mangler ett manuelt steg før
+den er aktiv.
+
 Databaseskjemaet ligger i [`supabase/migrations/`](./supabase/migrations/) og er
 idempotent. Kjør det mot en ny database (eller mot prod for å få kolonner som er
 kommet til senere) via Supabase SQL-editor eller `supabase db push`.

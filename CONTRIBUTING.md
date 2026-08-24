@@ -30,8 +30,10 @@ Ingen commit med røde sjekker.
 - [ ] Ingen hemmeligheter i diffen
 - [ ] Skjemaendring? Migrasjon lagt i `supabase/migrations/`
 
-De samme sjekkene kjører i CI (`.github/workflows/ci.yml`) på hver PR — men
-finn feilene lokalt, ikke i en rød pipeline.
+De samme sjekkene skal kjøre i CI på hver PR. Workflowen ligger klar i
+[`docs/ci/ci.yml`](./docs/ci/ci.yml) og trenger ett manuelt steg for å aktiveres
+— se [docs/ci/README.md](./docs/ci/README.md). Finn uansett feilene lokalt, ikke
+i en rød pipeline.
 
 Feiler noe du ikke klarer å fikse: si det rett ut, med utdata. Ikke rapporter
 ferdig med røde tester, og aldri basert på kodelesing alene.

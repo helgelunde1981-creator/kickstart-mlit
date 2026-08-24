@@ -1,0 +1,49 @@
+name: CI
+
+# Sjekklista i CONTRIBUTING.md sto tidligere kun i en fil — nå kjører den
+# faktisk. Ingen PR skal kunne merges med rød typecheck, lint eller test.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kvalitet:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tester
+        run: pnpm test
+
+      - name: Bygg
+        run: pnpm build
+        env:
+          # Bygget trenger ikke ekte verdier — klientene lages først ved kall.
+          ANTHROPIC_API_KEY: build-placeholder
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: build-placeholder
+          ADMIN_EMAIL: build@placeholder.no
+          ADMIN_PASSWORD: build-placeholder

@@ -25,4 +25,5 @@ den gamle til **Status: Erstattet av NNNN**. Ikke rediger historikken.
 | [0001](./0001-signert-admin-sesjon.md) | Signert admin-sesjon i stedet for fast cookie-verdi | Vedtatt | 2026-08-24 |
 | [0002](./0002-modellvalg-og-prompt-caching.md) | Claude Opus 5 med prompt caching for spec-generering | Vedtatt | 2026-08-24 |
 | [0003](./0003-database-migrasjoner-i-repo.md) | Databaseskjemaet bor i repoet | Vedtatt | 2026-08-24 |
+| [0004](./0004-bakgrunnsjobb-for-generering.md) | Serveren driver genereringen, ikke nettleseren | Vedtatt | 2026-08-24 |
 

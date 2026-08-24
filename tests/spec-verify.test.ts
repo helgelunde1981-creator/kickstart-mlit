@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { verifyContent } from "@/app/api/kickstart/stream/route";
+import { verifyContent } from "@/lib/kickstart/verify";
 
 function fullSpec(): string {
   return (

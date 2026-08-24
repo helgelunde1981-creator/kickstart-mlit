@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { KickstartProject, PriceEstimate, BootstrapResult } from "@/lib/kickstart/types";
 import { DESIGN_DIRECTIONS, PROJECT_TYPES, TECH_OPTIONS, AUTH_OPTIONS } from "@/lib/kickstart/tech-options";
 import ProjectEditForm from "@/components/kickstart/ProjectEditForm";
 import GenerationPanel from "@/components/kickstart/GenerationPanel";
-import { useSpecGeneration } from "@/components/kickstart/useSpecGeneration";
+import { isActive, useGenerationJob } from "@/components/kickstart/useGenerationJob";
 
 function labelOf(id: string | null, options: { id: string; label: string }[]): string {
   if (!id) return "–";
@@ -31,7 +31,7 @@ export default function ProjectDetailClient({
     setProject(initial);
   }, [initial]);
 
-  const { state, start } = useSpecGeneration();
+  const { state, start } = useGenerationJob(initial.id);
 
   const [estimating, setEstimating] = useState(false);
   const [estimate, setEstimate] = useState<PriceEstimate | null>(initial.price_estimate);
@@ -49,18 +49,32 @@ export default function ProjectDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const generatedParts = state.finished ? totalParts : (project.generated_parts ?? (project.project_md ? 1 : 0));
+  const job = state.snapshot?.job ?? null;
+  const running = isActive(job) || state.starting;
+  // Statusen fra pollingen er ferskere enn serverpropen mellom refresher.
+  const generatedParts = state.snapshot?.project.generated_parts ?? project.generated_parts ?? (project.project_md ? 1 : 0);
   const partial = generatedParts > 0 && generatedParts < totalParts;
-  const projectMd = state.projectMd ?? project.project_md;
+  const complete = generatedParts >= totalParts;
+  const projectMd = project.project_md;
+  const showPanel = running || Boolean(job);
+
+  // Når løpet blir ferdig, hent serverdata på nytt slik at knapper, status og
+  // spec-lenke stemmer uten at brukeren må laste siden selv.
+  const lastStatus = useRef<string | null>(null);
+  useEffect(() => {
+    const status = job?.status ?? null;
+    if (lastStatus.current && status !== lastStatus.current && (status === "completed" || status === "failed")) {
+      router.refresh();
+    }
+    lastStatus.current = status;
+  }, [job?.status, router]);
 
   async function regenerate() {
     await start({ project_id: project.id, regenerate: true });
-    router.refresh();
   }
 
   async function resume() {
-    await start({ project_id: project.id, part: generatedParts + 1 });
-    router.refresh();
+    await start({ project_id: project.id });
   }
 
   async function getEstimate() {
@@ -235,14 +249,14 @@ export default function ProjectDetailClient({
       </section>
 
       {/* Fremdrift på specen */}
-      {partial && !state.running && (
+      {partial && !running && (
         <div className="card border-warning/40 bg-warning-soft p-4 text-sm">
           <p className="font-medium text-warning">
             Specen er delvis generert — del {generatedParts} av {totalParts}.
           </p>
           <p className="mt-1 text-muted">
             Det som er generert er lagret. «Fortsett generering» tar resten uten å skrive om det som
-            allerede står.
+            allerede står — og kjører på serveren, så du kan lukke siden mens den jobber.
           </p>
         </div>
       )}
@@ -250,16 +264,16 @@ export default function ProjectDetailClient({
       {/* Handlinger */}
       <div className="flex flex-wrap gap-2.5">
         {partial && (
-          <button onClick={resume} disabled={state.running} className="btn btn-primary">
-            {state.running ? "Genererer…" : `Fortsett generering (del ${generatedParts + 1})`}
+          <button onClick={resume} disabled={running} className="btn btn-primary">
+            {running ? "Genererer…" : `Fortsett generering (del ${generatedParts + 1})`}
           </button>
         )}
         <button
           onClick={regenerate}
-          disabled={state.running}
-          className={partial ? "btn btn-secondary" : "btn btn-primary"}
+          disabled={running}
+          className={partial || complete ? "btn btn-secondary" : "btn btn-primary"}
         >
-          {state.running ? "Genererer…" : projectMd ? "Regenerer spec" : "Generer PROJECT.md"}
+          {running ? "Genererer…" : projectMd ? "Regenerer spec" : "Generer PROJECT.md"}
         </button>
 
         {projectMd && (
@@ -275,7 +289,7 @@ export default function ProjectDetailClient({
             </button>
           </>
         )}
-        <button onClick={remove} disabled={deleting || state.running} className="btn btn-danger ml-auto">
+        <button onClick={remove} disabled={deleting || running} className="btn btn-danger ml-auto">
           {deleting ? "Sletter…" : "Slett prosjekt"}
         </button>
       </div>
@@ -285,7 +299,7 @@ export default function ProjectDetailClient({
         </p>
       )}
 
-      {(state.running || state.log.length > 0) && <GenerationPanel state={state} />}
+      {showPanel && <GenerationPanel state={state} />}
 
       {estimateError && (
         <p role="alert" className="text-sm text-danger">

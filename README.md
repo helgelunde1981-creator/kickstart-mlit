@@ -36,7 +36,8 @@ CI-workflowen ligger i [`docs/ci/`](./docs/ci/) og mangler ett manuelt steg før
 den er aktiv.
 
 Databaseskjemaet ligger i [`supabase/migrations/`](./supabase/migrations/) og er
-idempotent. Kjør det mot en ny database (eller mot prod for å få kolonner som er
+idempotent. **Bakgrunnsgenereringen krever at migrasjonene er kjørt** — uten
+tabellen `kickstart_generation_jobs` kan ingen jobb legges i kø. Kjør det mot en ny database (eller mot prod for å få kolonner som er
 kommet til senere) via Supabase SQL-editor eller `supabase db push`.
 
 `GET /api/kickstart/health` (krever innlogging) svarer på om standardfilene og
@@ -47,23 +48,39 @@ miljøvariablene faktisk er på plass i miljøet du kjører i.
 ## Slik henger det sammen
 
 ```
-Wizard (9 steg)  ──POST──▶  /api/kickstart/stream ──▶ Claude (12 kall)
-      │                            │                        │
-      │                            ├── docs/standards/*.md ──┘   (systemprompt,
-      │                            │                             spec-mal,
-      │                            │                             quality gates …)
-      │                            ▼
-      │                     Supabase: kickstart_projects
-      │                     (project_md + generated_parts oppdateres per del)
+Wizard (9 steg)
+      │
+      │ POST /api/kickstart/generate   ← svarer på under et sekund
       ▼
-Prosjektside ──▶ prisestimat · mockup-bilder · bootstrap (GitHub/Supabase/Vercel)
+kickstart_generation_jobs (kø i databasen)
+      │
+      │ POST /api/kickstart/worker  ──▶  én del  ──▶ Claude
+      │        ▲                            │
+      │        │  kjeder seg selv videre    ├── docs/standards/*.md
+      │        │  til alle 12 er ferdige    ▼
+      │        │                     kickstart_projects
+      │        │                     (project_md + generated_parts per del)
+      │        │
+      │   /api/kickstart/cron (hvert 5. min): vaktpost som gjenoppliver
+      │   jobber som har stoppet opp
+      ▼
+Prosjektside (poller status) ──▶ prisestimat · mockup-bilder · bootstrap
 ```
 
-**Genereringen skjer i 12 deler, én HTTP-request per del.** Det er ikke en
-detalj — det er hele grunnen til at den fungerer: én request på ~100 000 tokens
-ville truffet Vercels 300-sekundersgrense. Hver ferdig del lagres i databasen
-med `generated_parts`, så et avbrudd (mobilnett, lukket fane) kan gjenopptas
-med **«Fortsett generering»** i stedet for å starte forfra.
+**Genereringen kjører på serveren, ikke i nettleseren.** Klienten starter et løp
+og poller status; den driver ingenting. Derfor stopper ikke genereringen av at
+telefonen låser seg, fanen lukkes eller nettet forsvinner — man kommer bare
+tilbake til en side som har kommet lenger.
+
+**Hver del er én invokasjon.** Én request på ~100 000 tokens ville truffet
+Vercels 300-sekundersgrense; med én del per kjøring er marginen god, og et krasj
+koster maks én del. Worker-en svarer med en gang og gjør arbeidet i `after()`,
+så kjedingen mellom delene aldri holder en forbindelse åpen i minutter.
+
+Tre ting sikrer at løpet kommer i mål: kjedingen (rask, normalveien),
+cron-vaktposten hvert 5. minutt (fanger jobber som stoppet opp), og
+`attempts`-telleren som gir opp etter tre forsøk på samme del i stedet for å
+brenne penger i en løkke.
 
 Standardene i `docs/standards/` er *inputen* til hver eneste del, og sendes med
 prompt caching (`cache_control`) slik at de ~40 000 tokenene betales fullt kun
@@ -75,7 +92,9 @@ prompt caching (`cache_control`) slik at de ~40 000 tokenene betales fullt kun
 | --- | --- |
 | `src/app/admin/kickstart/` | Liste, prosjektside, PROJECT.md-visning |
 | `src/components/kickstart/` | Wizard, redigering, fremdriftspanel, valgkomponenter |
-| `src/components/kickstart/useSpecGeneration.ts` | SSE-løkken for hele 12-dels-genereringen |
+| `src/lib/kickstart/jobs.ts` | Kø og tilstandsmaskin for genereringsløp |
+| `src/lib/kickstart/worker.ts` | Genererer én del og setter jobben klar til neste |
+| `src/components/kickstart/useGenerationJob.ts` | Klientens statuspolling (driver ingenting selv) |
 | `src/lib/kickstart/generate.ts` | Claude-kallet per del (caching, retry, usage) |
 | `src/lib/kickstart/standards.ts` | Bygger prompten av `docs/standards/*.md` |
 | `src/lib/kickstart/bootstrap/` | GitHub-, Supabase- og Vercel-oppretting |
@@ -110,6 +129,8 @@ advarselen i [AGENTS.md](./AGENTS.md).
 | `BOOTSTRAP_GITHUB_TOKEN`, `BOOTSTRAP_GITHUB_OWNER` | Ingen GitHub-repo i bootstrap |
 | `SUPABASE_MANAGEMENT_TOKEN`, `SUPABASE_ORG_ID` | Ingen Supabase-prosjekt i bootstrap |
 | `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | Ingen Vercel-prosjekt i bootstrap |
+| `GENERATION_WORKER_SECRET` | Appen bruker `ADMIN_PASSWORD` når den kaller seg selv (worker/cron) |
+| `CRON_SECRET` | Samme — settes den, brukes den også av Vercel Cron |
 | `LEADRADAR_HANDOFF_SECRET` | `/api/leadradar-handoff` svarer 401 på alt |
 | `NEXT_PUBLIC_SITE_URL` | LeadRadar får `https://kickstart.mlit.no` som lenkebase |
 
@@ -128,8 +149,9 @@ Content-Type: application/json
 ```
 
 Kun `client_name` og `project_name` er påkrevd; resten får defaults. Endepunktet
-genererer **del 1 av 12** og returnerer `project_id` + `project_url`. Resten
-fullføres i admin med «Fortsett generering».
+oppretter prosjektet, legger et genereringsløp i kø og svarer umiddelbart med
+`project_id`, `project_url` og `job_id`. Hele specen genereres i bakgrunnen —
+LeadRadar venter ikke.
 
 Hemmeligheten er bevisst en annen enn admin-passordet: LeadRadar skal kunne
 opprette prosjekter, ikke logge inn.

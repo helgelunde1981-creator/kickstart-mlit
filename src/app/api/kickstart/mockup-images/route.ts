@@ -53,15 +53,17 @@ export async function POST(req: NextRequest) {
           const dataUrl = `data:${mimeType};base64,${base64}`;
           images.push(dataUrl);
           send({ type: "image", index: i + 1, total: prompts.length, dataUrl });
+
+          // Lagre etter hvert bilde: lukkes fanen midt i, beholder vi det som
+          // faktisk er generert i stedet for å kaste hele runden.
+          await saveMockupImages(project.id, images);
         } catch (e) {
           send({ type: "image_error", index: i + 1, total: prompts.length, message: (e as Error).message });
         }
       }
 
-      try {
-        await saveMockupImages(project.id, images);
-      } catch (e) {
-        send({ type: "error", message: `Lagring feilet: ${(e as Error).message}` });
+      if (images.length === 0) {
+        send({ type: "error", message: "Ingen bilder ble generert" });
         controller.close();
         return;
       }

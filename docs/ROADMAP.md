@@ -47,21 +47,20 @@ pålitelig, fordi modellen selv skriver `---`.
 Enhetstestene dekker rendering, validering, sesjon og verifisering. Selve
 12-dels-løkken (avbrudd, gjenopptakelse, lagring) er kun testet manuelt.
 
-**Løsning:** Playwright mot en mocket `/api/kickstart/stream` som spiller av en
-lagret SSE-sekvens — inkludert et avbrudd midt i del 5.
+**Løsning:** Playwright mot mockede `/api/kickstart/generate` og `/api/kickstart/job`
+som spiller av et helt løp — inkludert en jobb som feiler på del 5 og blir
+gjenopptatt.
 
 ---
 
 ## P2 — verdt å gjøre
 
-### Genereringen dør hvis fanen lukkes
-Løkken drives fra nettleseren: hver del er en egen request som klienten starter.
-Delene som er ferdige er lagret, og «Fortsett generering» tar resten — men det
-krever at et menneske kommer tilbake.
+### Ingen token-streaming mens jobben går
+Bakgrunnskjøringen (ADR 0004) kostet oss den løpende teksten: statusen viser
+fremdrift per del og de siste lagrede linjene, ikke ord for ord.
 
-**Løsning:** Flytt løkken til en kø (Vercel Cron / QStash) som driver seg selv,
-og la UI-et bare vise status. Merk: da må hver del kjøre innenfor 300 s alene,
-noe den gjør i dag.
+**Løsning:** Supabase Realtime — worker-en publiserer deltaer på en kanal,
+klienten lytter når den er åpen. Ingen av dem eier løpet, så robustheten består.
 
 ### Ingen versjonshistorikk på PROJECT.md
 «Regenerer spec» overskriver forrige versjon. Var den forrige bedre, finnes den

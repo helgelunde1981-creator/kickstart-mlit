@@ -56,6 +56,11 @@ Claude, etter standardene i `docs/standards/`. Arkitekturen står i
    ignorert `Response` er en feil som ser ut som suksess i loggen.
 7. **Modell-ID-er bor i `src/lib/kickstart/model.ts`.** Ikke skriv dem inn i
    kallene.
+8. **Langvarig arbeid skal aldri drives av nettleseren.** Genereringen eies av
+   jobbkøen (`kickstart_generation_jobs`, ADR 0004): klienten legger i kø og
+   poller status. Nye oppgaver som tar mer enn noen sekunder skal gjøres på
+   samme måte — en lukket fane eller en låst telefon skal ikke kunne stoppe
+   noe.
 
 ## Før du melder ferdig
 

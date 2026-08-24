@@ -1,115 +1,140 @@
 "use client";
-import { useEffect, useRef } from "react";
-import { GenerationState } from "./useSpecGeneration";
+import { useEffect, useRef, useState } from "react";
+import { PART_TITLES } from "@/lib/kickstart/parts";
+import { GenerationJobState, isActive } from "./useGenerationJob";
 
-const KIND_STYLES: Record<string, string> = {
-  info: "text-[#9aa3b5]",
-  ok: "text-[#66d19e]",
-  warn: "text-[#e6b25c]",
-  error: "text-[#ff8079]",
-};
-
-const KIND_PREFIX: Record<string, string> = {
-  info: "▶",
-  ok: "✓",
-  warn: "!",
-  error: "✗",
-};
-
-function formatElapsed(seconds: number): string {
+function formatElapsed(fromIso: string, now: number): string {
+  const seconds = Math.max(0, Math.round((now - new Date(fromIso).getTime()) / 1000));
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-export default function GenerationPanel({ state }: { state: GenerationState }) {
-  const logRef = useRef<HTMLDivElement>(null);
-  const liveRef = useRef<HTMLPreElement>(null);
+export default function GenerationPanel({ state }: { state: GenerationJobState }) {
+  const tailRef = useRef<HTMLPreElement>(null);
+  const [now, setNow] = useState<number | null>(null);
+
+  const snapshot = state.snapshot;
+  const job = snapshot?.job ?? null;
+  const running = isActive(job) || state.starting;
+
+  // Klokka starter først på klienten — server og klient ville ellers rendret
+  // ulik tid og gitt hydreringsfeil.
+  useEffect(() => {
+    if (!running) return;
+    const first = setTimeout(() => setNow(Date.now()), 0);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [running]);
 
   useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [state.log]);
+    if (tailRef.current) tailRef.current.scrollTop = tailRef.current.scrollHeight;
+  }, [snapshot?.tail]);
 
-  useEffect(() => {
-    if (liveRef.current) liveRef.current.scrollTop = liveRef.current.scrollHeight;
-  }, [state.liveText]);
+  const totalParts = snapshot?.project.total_parts ?? job?.total_parts ?? PART_TITLES.length;
+  const done = snapshot?.project.generated_parts ?? 0;
+  const percent = Math.round((done / totalParts) * 100);
+  const currentPart = job ? Math.min(job.next_part, totalParts) : done + 1;
+  const partTitle = PART_TITLES[currentPart - 1] ?? "";
 
-  const done = state.part > 0 ? state.part - (state.running ? 1 : 0) : 0;
-  const percent = state.finished ? 100 : Math.round((done / state.totalParts) * 100);
+  const heading = state.starting
+    ? "Starter generering…"
+    : job?.status === "completed"
+      ? "PROJECT.md er ferdig"
+      : job?.status === "failed"
+        ? "Genereringen stoppet"
+        : job?.status === "cancelled"
+          ? "Genereringen ble avbrutt"
+          : job?.status === "running"
+            ? `Skriver del ${currentPart} av ${totalParts}`
+            : job?.status === "queued"
+              ? `I kø — del ${currentPart} av ${totalParts}`
+              : `${done} av ${totalParts} deler ferdig`;
 
   return (
-    <section className="card overflow-hidden" aria-label="Fremdrift for generering">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+    <section className="card overflow-hidden" aria-label="Status for generering">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line px-4 py-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold">
-            {state.failed
-              ? "Generering stoppet"
-              : state.finished
-                ? "PROJECT.md er ferdig"
-                : `Genererer — del ${Math.max(state.part, 1)} av ${state.totalParts}`}
-          </h2>
-          {state.partTitle && (
-            <p className="truncate font-mono text-xs text-faint" title={state.partTitle}>
-              {state.partTitle}
+          <h2 className="text-sm font-semibold">{heading}</h2>
+          {running && partTitle && (
+            <p className="truncate font-mono text-xs text-faint" title={partTitle}>
+              {partTitle}
             </p>
           )}
         </div>
-        {state.running && (
-          <span className="shrink-0 font-mono text-xs text-muted" aria-label="Medgått tid">
-            {formatElapsed(state.elapsedSeconds)}
+        {running && job && now !== null && (
+          <span className="shrink-0 font-mono text-xs text-muted" aria-label="Tid siden start">
+            {formatElapsed(job.created_at, now)}
           </span>
         )}
       </div>
 
-      {/* Fremdrift i tall og som stolpe — 12 deler tar 10–20 minutter, og da
-          holder det ikke med en spinner. */}
       <div
         role="progressbar"
         aria-valuemin={0}
-        aria-valuemax={state.totalParts}
+        aria-valuemax={totalParts}
         aria-valuenow={done}
-        aria-valuetext={`Del ${done} av ${state.totalParts} ferdig`}
+        aria-valuetext={`${done} av ${totalParts} deler ferdig`}
         className="h-1 w-full bg-surface-2"
       >
         <div
-          className={`h-full transition-[width] duration-500 ${state.failed ? "bg-danger" : "bg-accent"}`}
+          className={`h-full transition-[width] duration-700 ${
+            job?.status === "failed" ? "bg-danger" : "bg-accent"
+          }`}
           style={{ width: `${percent}%` }}
         />
       </div>
 
-      <div
-        ref={logRef}
-        aria-live="polite"
-        className="terminal max-h-40 space-y-0.5 overflow-y-auto px-4 py-3"
-      >
-        {state.log.map((line, i) => (
-          <div key={i} className={KIND_STYLES[line.kind]}>
-            {KIND_PREFIX[line.kind]} {line.text}
-          </div>
-        ))}
-        {state.running && <div className="animate-pulse text-[#7b93ff]">▋</div>}
+      <div className="space-y-3 px-4 py-3">
+        <p aria-live="polite" className="text-sm text-muted">
+          {running ? (
+            <>
+              <span className="font-medium text-fg">
+                Du kan lukke fanen eller låse telefonen.
+              </span>{" "}
+              Genereringen kjører på serveren og fortsetter uansett — kom tilbake hit når du vil for
+              å se hvor langt den er kommet.
+            </>
+          ) : job?.status === "completed" ? (
+            `Alle ${totalParts} delene er generert og lagret.`
+          ) : job?.status === "failed" ? (
+            "Delene som ble ferdige er lagret. Du kan fortsette derfra."
+          ) : (
+            `${done} av ${totalParts} deler er lagret.`
+          )}
+        </p>
+
+        {job?.last_error && (
+          <p className="rounded-lg bg-danger-soft px-3 py-2 text-xs text-danger">
+            Siste feil (forsøk {job.attempts} av 3): {job.last_error}
+          </p>
+        )}
+
+        {state.error && (
+          <p role="alert" className="text-sm text-danger">
+            {state.error}
+          </p>
+        )}
+
+        {snapshot && snapshot.total_chars > 0 && (
+          <p className="text-xs text-faint">
+            {snapshot.total_chars.toLocaleString("nb-NO")} tegn skrevet
+          </p>
+        )}
       </div>
 
-      {state.liveText && (
-        <pre
-          ref={liveRef}
-          className="terminal max-h-80 overflow-y-auto whitespace-pre-wrap break-words border-t border-[#1d222c] px-4 py-3 text-[#a9d7bd]"
-        >
-          {state.liveText}
-        </pre>
-      )}
-
-      {state.verifyChecks && (
-        <div className="grid gap-x-4 gap-y-1 border-t border-line px-4 py-3 sm:grid-cols-2">
-          {state.verifyChecks.map((c, i) => (
-            <div
-              key={i}
-              className={`flex items-center gap-1.5 font-mono text-xs ${c.ok ? "text-success" : "text-danger"}`}
-            >
-              <span aria-hidden>{c.ok ? "✓" : "✗"}</span>
-              <span>{c.label}</span>
-            </div>
-          ))}
+      {snapshot?.tail && (
+        <div className="border-t border-line">
+          <p className="px-4 pt-3 text-xs text-faint">Siste lagrede tekst</p>
+          <pre
+            ref={tailRef}
+            className="terminal mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap break-words px-4 py-3 text-[#a9d7bd]"
+          >
+            {snapshot.tail}
+          </pre>
         </div>
       )}
     </section>

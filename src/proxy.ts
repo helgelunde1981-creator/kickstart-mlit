@@ -19,5 +19,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/kickstart/:path*"],
+  // worker og cron er unntatt: de kalles av serveren selv og av Vercel Cron,
+  // som har bearer-token og ingen cookie. De autentiserer selv med
+  // worker-hemmeligheten (se worker-auth.ts) — slipper de ikke gjennom her,
+  // stopper hele bakgrunnsgenereringen.
+  matcher: ["/admin/:path*", "/api/kickstart/((?!worker|cron).*)"],
 };

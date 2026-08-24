@@ -16,7 +16,7 @@ import ChipSelector from "./ChipSelector";
 import ColorPicker from "./ColorPicker";
 import DesignDirectionPreview from "./DesignDirectionPreview";
 import GenerationPanel from "./GenerationPanel";
-import { useSpecGeneration } from "./useSpecGeneration";
+import { useGenerationJob } from "./useGenerationJob";
 
 const STEPS = [
   "Kundeinfo",
@@ -46,7 +46,7 @@ export default function KickstartWizard() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [maxStepReached, setMaxStepReached] = useState(0);
-  const { state, start, reset } = useSpecGeneration();
+  const { state, start } = useGenerationJob(null);
 
   const form = useForm<WizardSchema>({
     resolver: zodResolver(wizardSchema),
@@ -76,7 +76,8 @@ export default function KickstartWizard() {
 
   const { register, watch, setValue, getValues, trigger, formState: { errors } } = form;
   const values = watch();
-  const started = state.running || state.finished || state.failed;
+  const job = state.snapshot?.job ?? null;
+  const started = state.starting || Boolean(state.projectId);
 
   async function goNext() {
     const valid = await trigger(FIELDS_BY_STEP[step]);
@@ -101,52 +102,41 @@ export default function KickstartWizard() {
     await start(getValues());
   }
 
-  // === Ferdig ===
-  if (state.finished && state.projectId) {
-    return (
-      <div className="space-y-4">
-        <GenerationPanel state={state} />
-        <div className="card p-6 text-center">
-          <p className="mb-1 font-medium">Prosjektet er opprettet</p>
-          <p className="mb-5 text-sm text-muted">
-            PROJECT.md er generert i {state.totalParts} deler og lagret.
-          </p>
-          <button
-            onClick={() => router.push(`/admin/kickstart/${state.projectId}`)}
-            className="btn btn-primary"
-          >
-            Åpne prosjektet
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // === Under generering / feilet ===
+  // === Startet: serveren driver løpet videre uten oss ===
   if (started) {
+    const finished = job?.status === "completed";
+    const stopped = job?.status === "failed" || job?.status === "cancelled";
+
     return (
       <div className="space-y-4">
         <GenerationPanel state={state} />
-        {state.failed && (
+
+        {state.projectId && (
           <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
             <p className="text-sm text-muted">
-              {state.projectId
-                ? "Delene som ble ferdige er lagret. Fortsett fra prosjektsiden."
-                : "Ingenting ble lagret — prøv igjen."}
+              {finished
+                ? "Specen er klar."
+                : stopped
+                  ? "Du kan fortsette genereringen fra prosjektsiden."
+                  : "Prosjektet er opprettet. Alt som blir generert lagres underveis."}
             </p>
-            <div className="flex gap-2">
-              {state.projectId && (
-                <button
-                  onClick={() => router.push(`/admin/kickstart/${state.projectId}`)}
-                  className="btn btn-primary"
-                >
-                  Åpne prosjektet
-                </button>
-              )}
-              <button onClick={reset} className="btn btn-secondary">
-                Tilbake til skjemaet
-              </button>
-            </div>
+            <button
+              onClick={() => router.push(`/admin/kickstart/${state.projectId}`)}
+              className="btn btn-primary"
+            >
+              {finished ? "Åpne prosjektet" : "Følg med på prosjektsiden"}
+            </button>
+          </div>
+        )}
+
+        {!state.projectId && state.error && (
+          <div className="card p-4">
+            <p role="alert" className="mb-3 text-sm text-danger">
+              {state.error}
+            </p>
+            <button onClick={() => window.location.reload()} className="btn btn-secondary">
+              Tilbake til skjemaet
+            </button>
           </div>
         )}
       </div>
@@ -467,8 +457,8 @@ export default function KickstartWizard() {
 
             <div className="mt-4 rounded-xl bg-accent-soft p-3 text-xs text-accent">
               Claude genererer PROJECT.md i 12 deler etter MLIT-standardene. Det tar
-              10–20 minutter og koster penger i API-bruk. La fanen stå åpen — hver del
-              lagres underveis, så et avbrudd kan gjenopptas fra prosjektsiden.
+              10–20 minutter og koster penger i API-bruk. Genereringen kjører på serveren:
+              du kan lukke fanen, låse telefonen eller miste nettet uten at den stopper.
             </div>
           </div>
         )}

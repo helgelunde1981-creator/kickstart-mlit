@@ -1,7 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { buildGenerationPrompt, getSystemPrompt } from "./standards";
 import { WizardFormData, StreamEvent } from "./types";
-import { CACHE_TTL, CLAUDE_MODEL, MAX_ATTEMPTS_PER_PART, MAX_TOKENS_PER_PART } from "./model";
+import {
+  CACHE_TTL,
+  CLAUDE_MODEL,
+  MAX_ATTEMPTS_PER_PART,
+  MAX_TOKENS_PER_PART,
+  PART_DEADLINE_MS,
+} from "./model";
 import { PART_TITLES, TOTAL_PARTS } from "./parts";
 
 let cachedClient: Anthropic | null = null;
@@ -96,20 +102,31 @@ export async function* streamPart(
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_PART; attempt++) {
     partContent = "";
+    const startedAt = Date.now();
+
+    // Egen frist, litt innenfor plattformens: avbryter vi selv, får vi en
+    // feilmelding vi kan logge og lagre. Blir vi drept av Vercel, etterlater
+    // det seg ingenting annet enn et livstegn som stopper.
+    const deadline = new AbortController();
+    const deadlineTimer = setTimeout(() => deadline.abort(), PART_DEADLINE_MS);
+
     try {
-      const stream = client().messages.stream({
-        model: CLAUDE_MODEL,
-        max_tokens: MAX_TOKENS_PER_PART,
-        output_config: { effort: "high" },
-        system: [
-          {
-            type: "text",
-            text: systemPrompt,
-            cache_control: { type: "ephemeral", ttl: CACHE_TTL },
-          },
-        ],
-        messages,
-      });
+      const stream = client().messages.stream(
+        {
+          model: CLAUDE_MODEL,
+          max_tokens: MAX_TOKENS_PER_PART,
+          output_config: { effort: "high" },
+          system: [
+            {
+              type: "text",
+              text: systemPrompt,
+              cache_control: { type: "ephemeral", ttl: CACHE_TTL },
+            },
+          ],
+          messages,
+        },
+        { signal: deadline.signal },
+      );
 
       for await (const chunk of stream) {
         if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
@@ -129,9 +146,14 @@ export async function* streamPart(
           `[kickstart] Del ${partIndex + 1} traff max_tokens (${MAX_TOKENS_PER_PART}) — teksten kan være kuttet`,
         );
       }
+      console.log(
+        `[kickstart] Del ${partIndex + 1} brukte ${Math.round((Date.now() - startedAt) / 1000)} s`,
+      );
       break;
     } catch (e) {
-      const message = (e as Error).message;
+      const message = deadline.signal.aborted
+        ? `Del ${partIndex + 1} rakk ikke innenfor tidsgrensen (${Math.round(PART_DEADLINE_MS / 1000)} s). Vurder lavere max_tokens eller høyere maxDuration.`
+        : (e as Error).message;
       if (attempt < MAX_ATTEMPTS_PER_PART && isRetryable(e)) {
         const waitMs = 2000 * 2 ** (attempt - 1);
         console.warn(
@@ -143,7 +165,9 @@ export async function* streamPart(
         await sleep(waitMs);
         continue;
       }
-      throw e;
+      throw new Error(message);
+    } finally {
+      clearTimeout(deadlineTimer);
     }
   }
 

@@ -7,7 +7,10 @@ import { siteUrl } from "@/lib/kickstart/base-url";
 
 export const runtime = "nodejs";
 // Samme grense som worker: cron kjører en del selv når kjedingen ikke virker.
-export const maxDuration = 300;
+// Må være en statisk verdi — Next analyserer denne ved bygg, så en importert
+// konstant ville ikke virket. Holdes i synk med FUNCTION_MAX_DURATION_SECONDS
+// i model.ts, som fristen per del regnes ut fra.
+export const maxDuration = 800;
 export const dynamic = "force-dynamic";
 
 /**

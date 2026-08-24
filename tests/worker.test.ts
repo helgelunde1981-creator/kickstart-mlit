@@ -185,3 +185,15 @@ describe("runNextPart", () => {
     expect(deps.savePartial).not.toHaveBeenCalled();
   });
 });
+
+describe("tidsbudsjett", () => {
+  it("holder fristen per del innenfor plattformens grense", async () => {
+    // Ryker denne, blir delen drept av Vercel midt i skrivingen og hele
+    // arbeidet er tapt — slik det skjedde i produksjon 2026-08-24.
+    const { PART_DEADLINE_MS, FUNCTION_MAX_DURATION_SECONDS } = await import("@/lib/kickstart/model");
+
+    expect(PART_DEADLINE_MS).toBeLessThan(FUNCTION_MAX_DURATION_SECONDS * 1000);
+    // Minst 30 sekunders margin til å lagre og rapportere.
+    expect(FUNCTION_MAX_DURATION_SECONDS * 1000 - PART_DEADLINE_MS).toBeGreaterThanOrEqual(30_000);
+  });
+});

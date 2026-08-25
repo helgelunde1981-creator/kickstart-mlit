@@ -5,6 +5,7 @@ import {
   CACHE_TTL,
   CLAUDE_MODEL,
   MAX_ATTEMPTS_PER_PART,
+  MAX_SEGMENTS_PER_PART,
   MAX_TOKENS_PER_PART,
   PART_DEADLINE_MS,
 } from "./model";
@@ -24,6 +25,14 @@ function client(): Anthropic {
 
 export { PART_TITLES, TOTAL_PARTS } from "./parts";
 
+
+/**
+ * Modellen får ikke vite hvor lengdegrensen går, og skriver til den treffer den
+ * — midt i en setning. Dette ber den om å lande delen selv.
+ */
+const AVSLUTT_ORDENTLIG =
+  "Du har begrenset plass i dette svaret. Prioriter det viktigste, og AVSLUTT delen ordentlig " +
+  "med en fullført setning — aldri midt i et ord, en tabell eller en kodeblokk.";
 
 const FALLBACK_SYSTEM_PROMPT =
   "Du er Senior Design-Tech Architect for Myrvoll-Lunde IT Drift. Lever 10/10-kvalitet på alt.";
@@ -70,7 +79,9 @@ export async function* streamPart(
               },
               {
                 type: "text",
-                text: `Generer nå KUN ${title}. Start direkte med innholdet (# overskrift og videre).`,
+                text:
+                  `Generer nå KUN ${title}. Start direkte med innholdet (# overskrift og videre).\n\n` +
+                  AVSLUTT_ORDENTLIG,
               },
             ],
           },
@@ -93,7 +104,9 @@ export async function* streamPart(
           { role: "assistant", content: previousContent },
           {
             role: "user",
-            content: `Fortsett PROJECT.md. Generer nå KUN ${title}. Start direkte med innholdet — ikke gjenta noe fra delene over.`,
+            content:
+              `Fortsett PROJECT.md. Generer nå KUN ${title}. Start direkte med innholdet — ikke gjenta noe fra delene over.\n\n` +
+              AVSLUTT_ORDENTLIG,
           },
         ];
 
@@ -111,41 +124,92 @@ export async function* streamPart(
     const deadlineTimer = setTimeout(() => deadline.abort(), PART_DEADLINE_MS);
 
     try {
-      const stream = client().messages.stream(
-        {
-          model: CLAUDE_MODEL,
-          max_tokens: MAX_TOKENS_PER_PART,
-          output_config: { effort: "high" },
-          system: [
-            {
-              type: "text",
-              text: systemPrompt,
-              cache_control: { type: "ephemeral", ttl: CACHE_TTL },
-            },
-          ],
-          messages,
-        },
-        { signal: deadline.signal },
-      );
+      // Én del skrives i inntil MAX_SEGMENTS_PER_PART segmenter. Modellen
+      // treffer nemlig taket hver gang: 2026-08-24 endte hele specen midt i
+      // ordet «d». Treffer den taket, ber vi den fortsette der den slapp —
+      // men bare hvis det er tid igjen til å fullføre et segment til.
+      let segments = 0;
+      let truncated = false;
 
-      for await (const chunk of stream) {
-        if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-          partContent += chunk.delta.text;
-          yield { type: "delta", text: chunk.delta.text };
+      while (true) {
+        const segmentStartedAt = Date.now();
+        const segmentMessages: Anthropic.MessageParam[] = partContent
+          ? [
+              ...messages,
+              { role: "assistant", content: partContent },
+              {
+                role: "user",
+                content:
+                  "Du ble avbrutt av lengdegrensen. Fortsett nøyaktig der du slapp — " +
+                  "ikke gjenta noe, ikke oppsummer, ikke start på nytt. Skriv ferdig delen.",
+              },
+            ]
+          : messages;
+
+        const stream = client().messages.stream(
+          {
+            model: CLAUDE_MODEL,
+            max_tokens: MAX_TOKENS_PER_PART,
+            output_config: { effort: "high" },
+            system: [
+              {
+                type: "text",
+                text: systemPrompt,
+                cache_control: { type: "ephemeral", ttl: CACHE_TTL },
+              },
+            ],
+            messages: segmentMessages,
+          },
+          { signal: deadline.signal },
+        );
+
+        for await (const chunk of stream) {
+          if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+            partContent += chunk.delta.text;
+            yield { type: "delta", text: chunk.delta.text };
+          }
         }
-      }
 
-      const final = await stream.finalMessage();
-      usage = {
-        cached_input_tokens: final.usage.cache_read_input_tokens ?? 0,
-        input_tokens: final.usage.input_tokens,
-        output_tokens: final.usage.output_tokens,
-      };
-      if (final.stop_reason === "max_tokens") {
-        console.warn(
-          `[kickstart] Del ${partIndex + 1} traff max_tokens (${MAX_TOKENS_PER_PART}) — teksten kan være kuttet`,
+        const final = await stream.finalMessage();
+        segments++;
+        usage = {
+          cached_input_tokens: (usage?.cached_input_tokens ?? 0) + (final.usage.cache_read_input_tokens ?? 0),
+          input_tokens: (usage?.input_tokens ?? 0) + final.usage.input_tokens,
+          output_tokens: (usage?.output_tokens ?? 0) + final.usage.output_tokens,
+        };
+
+        if (final.stop_reason !== "max_tokens") break;
+
+        if (segments >= MAX_SEGMENTS_PER_PART) {
+          truncated = true;
+          console.warn(
+            `[kickstart] Del ${partIndex + 1} traff taket i alle ${segments} segmenter — teksten kan være kuttet`,
+          );
+          break;
+        }
+
+        // Start aldri et segment vi ikke rekker å fullføre: da ville fristen
+        // avbrutt oss midtveis og hele delen vært tapt.
+        const segmentMs = Date.now() - segmentStartedAt;
+        const remainingMs = PART_DEADLINE_MS - (Date.now() - startedAt);
+        if (remainingMs < segmentMs * 1.3) {
+          truncated = true;
+          console.warn(
+            `[kickstart] Del ${partIndex + 1} traff taket, men det er ikke tid til et segment til ` +
+              `(${Math.round(remainingMs / 1000)} s igjen, forrige tok ${Math.round(segmentMs / 1000)} s)`,
+          );
+          break;
+        }
+
+        console.log(
+          `[kickstart] Del ${partIndex + 1} traff taket etter segment ${segments} — fortsetter der den slapp`,
         );
       }
+
+      if (!truncated && segments > 1) {
+        console.log(`[kickstart] Del ${partIndex + 1} ble ferdig etter ${segments} segmenter`);
+      }
+
       console.log(
         `[kickstart] Del ${partIndex + 1} brukte ${Math.round((Date.now() - startedAt) / 1000)} s`,
       );

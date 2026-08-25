@@ -16,6 +16,13 @@ export const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL?.trim() || "claude-opus-
 export const MAX_TOKENS_PER_PART = 20_000;
 
 /**
+ * Hvor mange ganger vi ber modellen fortsette en del som traff lengdegrensen.
+ * Hver del traff taket i produksjonskjøringen 2026-08-24, og specen endte midt
+ * i et ord — ett segment er rett og slett ikke nok til en full del.
+ */
+export const MAX_SEGMENTS_PER_PART = 2;
+
+/**
  * Hvor lenge én invokasjon får lov å leve. Vercel dreper funksjonen når denne
  * er nådd — og dør vi midt i en del, er hele delen tapt.
  */

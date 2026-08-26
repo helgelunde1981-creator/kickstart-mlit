@@ -66,3 +66,21 @@ Claude, etter standardene i `docs/standards/`. Arkitekturen står i
 
 `pnpm check` (typecheck + lint + test) skal være grønn, og `pnpm build` skal gå
 gjennom. Se sjekklista i CONTRIBUTING.md.
+
+## Supabase og RLS — tre feller som har stengt et produkt
+
+- **Et `EXISTS` inne i en RLS-policy er selv underlagt RLS på tabellen det peker
+  på.** Kan ikke brukeren lese den tabellen, blir uttrykket alltid usant, og
+  policyen er umulig å oppfylle uansett hvilke rader som finnes. Bruk
+  `SECURITY DEFINER`-hjelpere, eller gi brukeren lesetilgang til sine EGNE rader.
+- **En ulest `error` gjør en feilet spørring til «ingen rader».**
+  `const { data } = await db.from(...).select(...)` uten `error` gir tom liste,
+  ingen logg og ingen som vet. Destrukturer alltid `error` og si fra når den er satt.
+- **Mer enn én fremmednøkkel til samme måltabell gjør embeds tvetydige** —
+  PostgREST svarer med feil i stedet for data. Skriv `mål!fk_navn(felt)`
+  eksplisitt. Én ny nullbar FK er nok til å tømme en liste som har virket lenge.
+- Etter enhver RLS-endring: kjør flytene som en VANLIG bruker, ikke bare som
+  admin. En rolle som ser 0 rader der admin ser data må forklares, ikke antas.
+
+*(Alle tre ble funnet i drift i Brannappen 26.08.2026. Ingen av dem ga
+feilmelding — alt så ut til å virke.)*

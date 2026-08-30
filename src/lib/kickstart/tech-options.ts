@@ -128,6 +128,55 @@ export const DESIGN_DIRECTIONS: DesignDirection[] = [
     signature: "Materielle teksturer · Monospace tall · Harde rutenett · Høy infotetthet",
     suitedFor: "B2B, transport, anlegg, entreprenør",
   },
+  {
+    id: "10-calm-product-ui",
+    label: "Calm Product UI",
+    description: "Lys, stille og presis app-flate. Lav visuell støy, hairline-borders, én rolig aksentfarge, alt på 8px-grid.",
+    signature: "Hairline-borders · Tett UI-typografi (13–15px) · Kbd-hints · 120ms mikro-transitions",
+    suitedFor: "SaaS-apper, dashboards, interne verktøy, portaler",
+  },
+  {
+    id: "11-soft-organic-warmth",
+    label: "Soft Organic Warmth",
+    description: "Varme nøytraler, store radier, vennlig humanist sans og myke illustrasjoner. Imøtekommende uten å bli barnslig.",
+    signature: "Kremhvite flater · 16–24px radier · Duotone-illustrasjoner · Generøs linjehøyde",
+    suitedFor: "Helse, utdanning, booking, lokale tjenester, frivillighet",
+  },
+  {
+    id: "12-playful-vibrant",
+    label: "Playful Vibrant",
+    description: "Mettede farger på store flater, tykke konturer, sticker-elementer og sprett i hover. Energi med byggekvalitet.",
+    signature: "Bold fargeblokker · Tykke outlines · Sticker-badges · Spring-basert hover-bounce",
+    suitedFor: "Barn/familie, mat og drikke, events, forbrukermerker",
+  },
+  {
+    id: "13-nordic-natural",
+    label: "Nordic Natural",
+    description: "Jordtoner, fullbredde naturfoto og rolig serif/sans-miks. Stedsfølelse og materialitet framfor effekter.",
+    signature: "Mose/skifer/fjord-palett · Fotodrevne heroes · Papir/grain-tekstur · Rolige crossfades",
+    suitedFor: "Reiseliv, sjømat/landbruk, håndverk, bærekraft",
+  },
+  {
+    id: "14-dark-developer-mono",
+    label: "Dark Developer Mono",
+    description: "Mørk-først flate med kalde grånyanser, monospace i UI-et og terminalblokker som designelement.",
+    signature: "Near-black med kald grå · Monospace UI-nøkler · Syntax-aksenter · Terminal som hero",
+    suitedFor: "Utviklerverktøy, API-produkter, tech-plattformer, hosting",
+  },
+  {
+    id: "15-heritage-editorial",
+    label: "Heritage Editorial",
+    description: "Klassisk serif-display, varme papirtoner og trykk-tradisjonens ro. Underspilt eleganse, ikke støvete nostalgi.",
+    signature: "Serif-display · Small-caps metadata · Tynne linjaler · Spaltebasert grid",
+    suitedFor: "Kultur, museum, advokat/tradisjon, vin og håndverksmat, forlag",
+  },
+  {
+    id: "16-aurora-gradient",
+    label: "Aurora Gradient",
+    description: "Lys flate med mesh/aurora-gradienter bak nøkkelseksjoner og sterk sort typografi. AI-æraens uttrykk uten mørk klisjé.",
+    signature: "Mesh-gradienter · Gradient kun på nøkkelord · Glow-shadows i aksent · Raus whitespace",
+    suitedFor: "AI-produkter, startups, innovasjonsprosjekter, produktlansering",
+  },
 ];
 
 export const MOTION_OPTIONS = [

@@ -1,0 +1,27 @@
+/* 08 — 3D Integration · tokens
+   Mørk scene-grunn som lar 3D-innholdet eie lyset. Indigo som teknisk
+   aksent. Tokens dekker også fallback — static render skal se bevisst ut. */
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #27364a;
+  --fg: #e2e8f0;
+  --muted: #94a3b8;
+  --faint: #64748b;
+  --line: rgba(99, 102, 241, 0.25);
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-soft: #1e2050;
+  --on-accent: #ffffff;
+
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-card: 0.625rem;
+  --shadow-scene: 8px 8px 24px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --gradient-edge: linear-gradient(90deg, #6366f1, transparent);
+  --perspective: 1000px;
+}
+/* Fallback-regel: uten WebGL rendres samme komposisjon som statisk bilde med
+   --shadow-scene — aldri et hull der 3D-en skulle vært. */

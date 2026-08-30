@@ -1,0 +1,41 @@
+/* 09 — Industrial / Robust · tokens
+   Matt og taktil. Mørk-først (verksted-flate), men lys variant finnes for
+   innholdstunge sider. Safety-orange kun til handling og status. */
+:root {
+  --bg: #1a1a1a;
+  --surface: #242424;
+  --surface-2: #2e2e2e;
+  --fg: #f5f5f5;
+  --muted: #a3a3a3;
+  --faint: #737373;
+  --line: #3a3a3a;
+  --accent: #f97316;            /* safety orange */
+  --accent-hover: #fb923c;
+  --accent-soft: #33200f;
+  --on-accent: #1a1a1a;
+  --success: #84cc16;
+  --danger: #ef4444;
+
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-sans: "Barlow", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-card: 0.25rem;
+  --shadow-card: 0 2px 0 rgba(0, 0, 0, 0.4);   /* flat og hard, ikke soft */
+  --texture-note: "subtil noise/metallkorn på store flater, aldri på tekstflater";
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #e8e6e1;
+    --surface: #f4f2ee;
+    --surface-2: #dcd9d2;
+    --fg: #1f1f1f;
+    --muted: #575757;
+    --faint: #8a8a86;
+    --line: #c6c3bb;
+    --accent: #d95f0e;
+    --accent-hover: #b84e08;
+    --accent-soft: #f7e3d2;
+    --on-accent: #ffffff;
+  }
+}

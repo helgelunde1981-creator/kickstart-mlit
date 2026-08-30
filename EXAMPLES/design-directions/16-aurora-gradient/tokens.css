@@ -1,0 +1,52 @@
+/* 16 — Aurora Gradient · tokens
+   Lys flate, sort typografi, mesh-gradient som identitetsbærer bak hero
+   (+ maks én seksjon til). Gradient-tekst kun på nøkkelord. */
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f7f7fa;
+  --fg: #0f0f14;
+  --muted: #52525e;
+  --faint: #9494a1;
+  --line: #ececf1;
+  --accent: #7c3aed;
+  --accent-hover: #6d28d9;
+  --accent-soft: #f1eafd;
+  --on-accent: #ffffff;
+  --aurora-1: rgba(124, 58, 237, 0.5);   /* lilla */
+  --aurora-2: rgba(37, 99, 235, 0.45);   /* blå */
+  --aurora-3: rgba(52, 211, 153, 0.35);  /* grønn */
+  --glow-accent: 0 4px 24px rgba(124, 58, 237, 0.35);  /* primærknapper */
+  --gradient-text: linear-gradient(90deg, #7c3aed, #2563eb);
+
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --radius-card: 0.875rem;
+  --shadow-card: 0 1px 3px rgba(15, 15, 20, 0.06);
+  --mesh: radial-gradient(40% 50% at 25% 70%, var(--aurora-1), transparent 65%),
+          radial-gradient(45% 45% at 70% 35%, var(--aurora-2), transparent 60%),
+          radial-gradient(35% 45% at 55% 80%, var(--aurora-3), transparent 60%);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d12;
+    --surface: #14141a;
+    --surface-2: #1b1b23;
+    --fg: #efeff3;
+    --muted: #a5a5b1;
+    --faint: #6b6b78;
+    --line: #26262f;
+    --accent: #a78bfa;
+    --accent-hover: #c4b0fc;
+    --accent-soft: #241d3d;
+    --on-accent: #0d0d12;
+    --aurora-1: rgba(124, 58, 237, 0.35);
+    --aurora-2: rgba(37, 99, 235, 0.3);
+    --aurora-3: rgba(52, 211, 153, 0.22);
+    --glow-accent: 0 4px 24px rgba(167, 139, 250, 0.25);
+    --gradient-text: linear-gradient(90deg, #a78bfa, #60a5fa);
+  }
+}
+/* Bevegelse: gradient-drift 20s+ loop, kun transform/opacity, og alltid av
+   under prefers-reduced-motion. */

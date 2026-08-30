@@ -1,0 +1,26 @@
+/* 05 — Glassmorphism Depth · tokens
+   Mørk gradient-grunn med ekte lag: glass er et materiale med blur og
+   border, aldri bare en halvtransparent flate. Subtil noise mot
+   plast-følelse. Én visuell verden — ingen lys variant. */
+:root {
+  --bg-gradient: linear-gradient(135deg, #7c3aed 0%, #2563eb 50%, #06b6d4 100%);
+  --bg-fallback: #2544c9;
+  --fg: #ffffff;
+  --muted: rgba(255, 255, 255, 0.72);
+  --faint: rgba(255, 255, 255, 0.5);
+  --glass: rgba(255, 255, 255, 0.12);
+  --glass-strong: rgba(255, 255, 255, 0.2);
+  --glass-border: rgba(255, 255, 255, 0.28);
+  --glass-blur: 16px;
+  --accent: #ffffff;            /* CTA er hvit på gradienten */
+  --on-accent: #2544c9;
+
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --radius-card: 1rem;
+  --shadow-card: 0 8px 32px rgba(10, 15, 60, 0.35);
+  --shadow-lift: 0 16px 48px rgba(10, 15, 60, 0.45); /* hover trekker frem */
+}
+/* Bruk: background: var(--glass); backdrop-filter: blur(var(--glass-blur));
+   border: 1px solid var(--glass-border); — alle tre, alltid sammen. */

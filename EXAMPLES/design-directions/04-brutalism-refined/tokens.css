@@ -1,0 +1,26 @@
+/* 04 — Brutalism Refined · tokens
+   Rå men lesbar: ink-borders overalt, harde skygger uten blur, én skrikende
+   grunnflate. Ingen dark mode — flaten er identiteten. */
+:root {
+  --bg: #f5f52a;
+  --surface: #ffffff;
+  --surface-2: #efefe4;
+  --fg: #111111;
+  --muted: #333333;
+  --faint: #666666;
+  --line: #111111;              /* borders ER ink, 2–3px */
+  --accent: #111111;
+  --accent-hover: #000000;
+  --accent-soft: #e8e83a;
+  --on-accent: #f5f52a;
+  --accent-2: #3d5afe;          /* elektrisk blå til lenker/hover-kunst */
+
+  --font-display: "Archivo Black", "Arial Black", sans-serif;
+  --font-sans: "Archivo", system-ui, sans-serif;
+  --font-mono: "Space Mono", ui-monospace, monospace;
+
+  --border-width: 2.5px;
+  --radius-card: 0;
+  --shadow-card: 5px 5px 0 #111111;      /* hard, aldri blur */
+  --shadow-card-hover: 2px 2px 0 #111111; /* «snapper» inn ved hover */
+}

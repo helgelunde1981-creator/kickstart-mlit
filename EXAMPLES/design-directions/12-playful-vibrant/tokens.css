@@ -1,0 +1,27 @@
+/* 12 — Playful Vibrant · tokens
+   Bevisst palett på 4 farger + ink — aldri regnbue. Tykke konturer og harde
+   skygger i ink binder det sammen. Én verden — energien er identiteten. */
+:root {
+  --bg: #fffdf5;
+  --surface: #ffffff;
+  --ink: #1e1147;               /* ALL tekst og alle konturer */
+  --fg: #1e1147;
+  --muted: #55497c;
+  --line: #1e1147;
+  --primary: #7c3aed;           /* lilla — hovedflater */
+  --sun: #ffd53e;               /* gul — badges, highlights */
+  --mint: #34d399;              /* grønn — suksess, variasjon */
+  --coral: #fb7185;             /* rosa — varsel-kunst, variasjon */
+  --on-primary: #ffffff;
+
+  --font-display: "Baloo 2", system-ui, sans-serif;
+  --font-sans: "Nunito", system-ui, sans-serif;
+
+  --border-width: 2.5px;
+  --radius-card: 1rem;
+  --radius-badge: 999px;
+  --shadow-card: 3px 3px 0 #1e1147;    /* hard, i ink */
+  --shadow-card-hover: 5px 5px 0 #1e1147;
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);  /* hover-bounce */
+  --sticker-rotate: 6deg;
+}

@@ -1,0 +1,40 @@
+/* 03 — Swiss Minimal Refined · tokens
+   Typografi-drevet. Én rød aksent, hairlines, ellers sort/hvitt.
+   Radius holdes nær null — presisjonen er poenget. */
+:root {
+  --bg: #ffffff;
+  --surface: #fafafa;
+  --surface-2: #f2f2f2;
+  --fg: #111111;
+  --muted: #5c5c5c;
+  --faint: #969696;
+  --line: #e5e5e5;
+  --line-strong: #111111;       /* baseline-linjaler */
+  --accent: #e52222;
+  --accent-hover: #c41c1c;
+  --accent-soft: #fdeaea;
+  --on-accent: #ffffff;
+
+  --font-sans: "Inter", "Helvetica Neue", Helvetica, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --radius-card: 0.125rem;
+  --shadow-card: none;          /* hierarki bygges med linjer, ikke skygge */
+  --baseline: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101010;
+    --surface: #181818;
+    --surface-2: #202020;
+    --fg: #f2f2f2;
+    --muted: #a8a8a8;
+    --faint: #6e6e6e;
+    --line: #2c2c2c;
+    --line-strong: #f2f2f2;
+    --accent: #ff5a5a;
+    --accent-hover: #ff7b7b;
+    --accent-soft: #331414;
+    --on-accent: #101010;
+  }
+}

@@ -1,0 +1,39 @@
+/* 07 — Scrollytelling Editorial · tokens
+   Ink-ledet lesing: nesten monokrom, serif-display, én varm markeringsfarge.
+   Bevegelsen (sticky stages, progress) er identiteten — paletten er stille. */
+:root {
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --surface-2: #f1f1ec;
+  --fg: #141414;
+  --muted: #575753;
+  --faint: #8f8f89;
+  --line: #dededa;
+  --accent: #141414;            /* ink er aksenten */
+  --accent-hover: #000000;
+  --accent-soft: #e9e4d8;       /* varm markering, som gul tusj nedtonet */
+  --on-accent: #fafaf8;
+
+  --font-display: "Source Serif 4", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --radius-card: 0.375rem;
+  --shadow-card: 0 1px 3px rgba(20, 20, 20, 0.07);
+  --progress-height: 3px;       /* scroll-progress øverst, i --fg */
+  --measure: 68ch;              /* maks linjelengde for fortellingen */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131311;
+    --surface: #1b1b18;
+    --surface-2: #242420;
+    --fg: #ecece7;
+    --muted: #a5a59d;
+    --faint: #71716a;
+    --line: #2e2e29;
+    --accent: #ecece7;
+    --accent-hover: #ffffff;
+    --accent-soft: #33301f;
+    --on-accent: #131311;
+  }
+}

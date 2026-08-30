@@ -1276,7 +1276,7 @@ State-fil i `~/.claude/bootstrap-state/{{repo_name}}/bootstrap-state.json` for �
 ### Absolutte regler (19)
 
 - [ ] **Regel 1 — Aldri generic templates:** § 2 bekrefter valgt 2026-retning + § 9 har faktiske tokens
-- [ ] **Regel 2 — Konkret designretning:** § 2 nevner én av de 9, ikke «clean modern»
+- [ ] **Regel 2 — Konkret designretning:** § 2 nevner én av de 16, ikke «clean modern»
 - [ ] **Regel 3 — Designsystem som kode:** § 9 har CSS custom properties + Tailwind-config-snutter
 - [ ] **Regel 4 — Signature moment:** § 5 har hva/hvor/oppførsel/hvorfor/suksessmetrikk
 - [ ] **Regel 5 — 10/10-suksesskriterier:** suksesskriterier-seksjonen lister ALLE terskler fra `04-QUALITY_GATES.md`

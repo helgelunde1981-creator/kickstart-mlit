@@ -1,0 +1,46 @@
+/* 14 — Dark Developer Mono · tokens
+   Mørk-først med kalde grånyanser (aldri pure black). To syntax-aksenter:
+   grønn (primær/status) og lilla (sekundær). Lysmodus er fullverdig. */
+:root {
+  --bg: #0a0a0c;
+  --surface: #141417;
+  --surface-2: #1b1b1f;
+  --fg: #e4e4e7;
+  --muted: #a1a1aa;
+  --faint: #71717a;
+  --line: #26262b;
+  --accent: #34d399;            /* terminal-grønn */
+  --accent-hover: #6ee7b7;
+  --accent-soft: #0e2a1f;
+  --on-accent: #0a0a0c;
+  --accent-2: #a78bfa;          /* syntax-lilla */
+  --danger: #f87171;
+  --warning: #fbbf24;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --radius-card: 0.5rem;
+  --shadow-card: none;          /* flatt — border gjør jobben */
+  --grid-pattern: radial-gradient(circle, #1e1e23 1px, transparent 1px); /* 24px */
+  --status-dot: 6px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --surface: #fafafa;
+    --surface-2: #f4f4f5;
+    --fg: #18181b;
+    --muted: #52525b;
+    --faint: #a1a1aa;
+    --line: #e4e4e7;
+    --accent: #059669;
+    --accent-hover: #047857;
+    --accent-soft: #e7f6ef;
+    --on-accent: #ffffff;
+    --accent-2: #7c3aed;
+    --danger: #dc2626;
+    --warning: #b45309;
+    --grid-pattern: radial-gradient(circle, #e9e9ec 1px, transparent 1px);
+  }
+}

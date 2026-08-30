@@ -137,7 +137,7 @@ For komplekse seksjoner, ekspander i tråd med `06-SECTION_DETAILS/`-fragmentene
 
 10/10 er ikke en målestokk vi spør om — det er en mandat vi leverer på.
 
-- **Design 10/10:** ikke generic. Velg én av de 9 kurerte retningene. Inkluder minst 4 av 10 design-kvaliteter fra `04-QUALITY_GATES.md` §5.2. Avvis eksplisitt anti-patterns.
+- **Design 10/10:** ikke generic. Velg én av de 16 kurerte retningene. Inkluder minst 4 av 10 design-kvaliteter fra `04-QUALITY_GATES.md` §5.2. Avvis eksplisitt anti-patterns.
 - **UX 10/10:** signature moment + designede hover/focus/active-states + meningsfull motion + tydelige tomme/feil/laste-tilstander.
 - **Funksjonalitet 10/10:** alle kundedata-features dekket, ingen pseudokode, ingen TODO. Hver feature med konkret datamodell og brukerflyt.
 - **UI 10/10:** designsystem som faktiske tokens, ikke prosa. Komponenter listet med variants.
@@ -156,7 +156,7 @@ Før du leverer specen, verifiser alle disse:
 
 **Struktur og fullstendighet:**
 - [ ] Alle 20 seksjoner finnes (ingen kan utelates uten eksplisitt "N/A — begrunnelse")
-- [ ] Designretning i seksjon 2 er én av de 9 fra `02-DESIGN_DIRECTIONS.md` — ikke generisk
+- [ ] Designretning i seksjon 2 er én av de 16 fra `02-DESIGN_DIRECTIONS.md` — ikke generisk
 - [ ] Konkurranseanalyse i seksjon 3 har minst 3 navngitte konkurrenter
 - [ ] Brand voice i seksjon 4 reflekterer kundens bransje og målgruppe
 - [ ] Signature moment i seksjon 5 er konkret nok til implementering (hva, hvor, oppførsel, states, suksessmetrikk)

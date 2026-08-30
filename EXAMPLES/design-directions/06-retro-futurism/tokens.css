@@ -1,0 +1,27 @@
+/* 06 — Retro-Futurism · tokens
+   CRT-mørke med neon og scanlines. Glow er identiteten — men brukes på
+   display og indikatorer, aldri på brødtekst. Én verden, ingen lys variant. */
+:root {
+  --bg: #04050f;
+  --surface: #0a0d1e;
+  --surface-2: #101530;
+  --fg: #d8ffee;
+  --muted: #7fbfa8;
+  --faint: #4a7a68;
+  --line: #1a2445;
+  --accent: #00ffb4;            /* neon-grønn */
+  --accent-hover: #66ffcf;
+  --accent-soft: #062b21;
+  --on-accent: #04050f;
+  --accent-2: #ff3da6;          /* magenta — sparsomt, til feil/varsel-kunst */
+
+  --font-display: "Share Tech Mono", ui-monospace, monospace;
+  --font-sans: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "Share Tech Mono", ui-monospace, monospace;
+
+  --radius-card: 0.25rem;
+  --glow-accent: 0 0 10px rgba(0, 255, 180, 0.7);
+  --scanlines: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0, 255, 180, 0.04) 3px, rgba(0, 255, 180, 0.04) 4px);
+  --grid: repeating-linear-gradient(0deg, transparent, transparent 23px, rgba(0, 255, 180, 0.06) 23px, rgba(0, 255, 180, 0.06) 24px),
+          repeating-linear-gradient(90deg, transparent, transparent 23px, rgba(0, 255, 180, 0.06) 23px, rgba(0, 255, 180, 0.06) 24px);
+}

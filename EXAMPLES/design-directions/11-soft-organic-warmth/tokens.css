@@ -1,0 +1,45 @@
+/* 11 — Soft Organic Warmth · tokens
+   Varme nøytraler — aldri kald #fff rett på skjerm. Store radier, myke
+   skygger med varm tone. Kontrastkrav (WCAG AA) holdes selv om paletten
+   er myk. */
+:root {
+  --bg: #faf5ee;
+  --surface: #fffdf9;
+  --surface-2: #f3e9dc;
+  --fg: #4a3b2e;
+  --muted: #7d6c59;
+  --faint: #a8998a;
+  --line: #eadfd0;
+  --accent: #d97f41;            /* varm oransje — mørk nok for hvit tekst */
+  --accent-hover: #c06a2f;
+  --accent-soft: #f9e8d8;
+  --on-accent: #ffffff;
+  --accent-2: #8fa583;          /* salvie — sekundær, til suksess/natur */
+  --danger: #c65f4a;
+
+  --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-sans: "Nunito Sans", system-ui, sans-serif;
+
+  --radius-card: 1.25rem;
+  --radius-control: 0.875rem;
+  --shadow-card: 0 6px 24px rgba(176, 103, 63, 0.1);  /* varm, aldri grå */
+  --blob-radius: 48% 52% 55% 45% / 50% 45% 55% 50%;   /* organiske former */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #211a13;
+    --surface: #2a221a;
+    --surface-2: #342a20;
+    --fg: #f2e8da;
+    --muted: #c4b3a0;
+    --faint: #8d7d6c;
+    --line: #3e3226;
+    --accent: #e8965a;
+    --accent-hover: #f0ab77;
+    --accent-soft: #3d2a1a;
+    --on-accent: #211a13;
+    --accent-2: #a4bc96;
+    --danger: #e08a76;
+    --shadow-card: 0 6px 24px rgba(0, 0, 0, 0.35);
+  }
+}

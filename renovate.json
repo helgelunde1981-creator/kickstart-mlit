@@ -40,6 +40,16 @@
       "labels": [
         "major-oppdatering"
       ]
+    },
+    {
+      "description": "Minor og patch automerges når CI er grønn — samme regel som org-presetet Framtid-Tech-Helge/renovate-config (platformAutomerge AV: Renovate merger selv, kun med grønne sjekker). Opprydding 06.10.2026: 60+ åpne minor/patch-PR-er lå og ventet.",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": false
     }
   ],
   "lockFileMaintenance": {

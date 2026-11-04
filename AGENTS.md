@@ -84,3 +84,50 @@ gjennom. Se sjekklista i CONTRIBUTING.md.
 
 *(Alle tre ble funnet i drift i Brannappen 26.08.2026. Ingen av dem ga
 feilmelding — alt så ut til å virke.)*
+
+## Felles sikkerhetsstandard (innført 04.11.2026)
+
+Gjelder alle Helges repoer. Selve workflowene (Gitleaks, Supabase-sjekker) og
+migrasjonene kommer som egne PR-er fra den som eier standarden. Ikke lag dem
+selv, og ikke skriv om dem når de er kommet.
+
+**Gjelder allerede nå:**
+
+- **Actions pinnes til full SHA.** Hver ny `uses:` i en workflow skrives med
+  full 40-tegns commit-SHA og versjonskommentar, f.eks.
+  `uses: actions/checkout@<40 tegn> # v5`. Aldri `@v5`, `@main` eller kort SHA.
+  Renovate pinner eksisterende linjer. Pin-PR-ene automerges og skal ikke
+  lukkes. En GitHub-regel som feiler workflows med upinnede actions kommer senere.
+- **Genererte filer redigeres ikke for hånd.** Filer med headeren «generert»
+  (bl.a. `supabase/tests/database/0N-*.test.sql`) endres bare av generatoren.
+  Drift-sjekken feiler hvis de er endret.
+
+**Kommer med standard-PR-en:**
+
+- **Gitleaks på alle PR-er.** Finner den en hemmelighet i en ny commit, blir
+  PR-en rød. Da: roter nøkkelen først (den kan være live), fjern den fra koden,
+  og si fra til Helge. Offentlige verdier (`NEXT_PUBLIC_*`, `VITE_*`,
+  anon-nøkkelen, Sentry DSN) gir ikke varsel.
+- Sjekkene rapporterer bare i en prøveperiode, og blir deretter påkrevde i
+  branch protection. Helge får beskjed før det slås på.
+
+**Supabase (dette repoet har Supabase):**
+
+- En baseline-migrasjon fjerner standardtilgangen `anon` har til nye tabeller
+  og funksjoner. `anon` får ikke lenger noe automatisk.
+- Seks pgTAP-tester (`supabase test db`) og en lint kjører i CI. **En ny tabell
+  uten RLS gir rød CI.**
+- Alt `anon` skal kunne gjøre, åpnes eksplisitt i en migrasjon og føres i
+  `supabase/tests/database/_config.sqlinc` med en kommentar om hvorfor.
+- Funksjonene (RPC-ene) appen kaller *før innlogging* er `anon`-allowlisten.
+  Den foreslås fra koden og godkjennes av Helge. Ikke legg til eller fjern noe
+  der uten hans godkjenning: gjetter vi feil, slutter innlogging eller
+  offentlige sider å virke.
+- Baseline kjøres aldri mot en eksisterende database uten tørrkjøring først.
+
+**Uendret:**
+
+- Grenflyten slik den står beskrevet for repoet: PR, grønn CI, merge til `dev`,
+  verifiser, så `main` (der repoet har `dev`). Ingen force push til `main` eller
+  `dev`.
+- Hemmeligheter ligger i Doppler.

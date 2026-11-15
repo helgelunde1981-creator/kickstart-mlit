@@ -112,7 +112,11 @@ Hver leveranse skal demonstrere minst 4 av disse på meningsfulle flater (forsid
 | Policyer per tabell (ikke wildcard) | Manuell review per migrasjon |
 | CSP med nonce — ikke `'unsafe-inline'` for script-src | `middleware.ts` |
 | Alle skjemaer: Turnstile + honeypot + Zod + rate-limit | Server Actions |
-| Secrets kun via env, aldri commited | `.gitignore` + `gh secret list`-sjekk |
+| Secrets kun i Doppler, aldri commited, ingen `.env`-filer | `doppler run` lokalt, Doppler-synk til Vercel + GitHub, Gitleaks på alle PR-er |
+| Actions pinnet til full 40-tegns SHA med versjonskommentar | Review av hver `uses:` + Renovate |
+| `anon` uten standardtilgang; allowlist starter tom | Baseline-migrasjon + pgTAP i CI; nye `anon`-rettigheter kun med Helges godkjenning |
+| `mfa_required`-policy på nye RLS-tabeller der MFA kreves | Restrictive policy som krever `aal2`, samme mønster som eksisterende tabeller |
+| Sikkerhetsrevisjon før PR som rører database eller API | Skillene `sikkerhet` + `sikker-database` |
 | Aldri service-role i klient | Lint-regel + manuell review |
 | HSTS preload | Vercel headers config |
 | X-Content-Type-Options: nosniff | Vercel headers |
@@ -355,7 +359,8 @@ Surveys lagres i `customer_surveys`-tabellen. Full standard: `06-SECTION_DETAILS
 - GitHub repo finnes under helgelunde1981-creator
 - Supabase prosjekt opprettet + linket
 - Vercel project koblet
-- Alle secrets på 3 steder (.env.local + Vercel + GitHub)
+- Linear-team, prosjekt, milepæler og saker opprettet (§9.14)
+- Alle secrets i Doppler (`dev` + `prd`) med synk til Vercel og GitHub Actions — ingen `.env`-filer
 - AGENTS.md, MEMORY.md, vault-notat opprettet
 
 Bruk `pnpm tsx scripts/create-mlit-project.ts --kickstart-id <id>` for automatisering. Full standard: `06-SECTION_DETAILS/sprint-0-bootstrap.md`.
@@ -365,6 +370,39 @@ Bruk `pnpm tsx scripts/create-mlit-project.ts --kickstart-id <id>` for automatis
 **Krav:** Hver PR til `main` skriver én rad til `delivery_scores`-tabellen i mlit-Supabase via `score-delivery.ts`. Brukes til trendanalyse, salg, og intern læring.
 
 Full standard: `06-SECTION_DETAILS/delivery-score.md`.
+
+## 9.14 Mandatory Linear-oppsett (alle prosjekter)
+
+**Krav:** Prosjektet settes opp i Linear før arbeidet starter: team (eget eller felles — avklares med Helge), prosjekt, og én milepæl per sprint. Hver sprintoppgave er en sak.
+
+- Planen og sakene bor i Linear — ikke i `docs/plans/` eller GitHub Issues
+- Grener heter som Linear foreslår (`helgelunde1981/<nøkkel>-<nr>-<kort-navn>`), så PR-en kobles til saken
+- En sak settes til Done først når endringen er verifisert (CI grønn, testet med ekte data, merget)
+- Hendelser og nye ønsker legges i Linear med en gang
+
+## 9.15 Mandatory faste arbeidsregler (alle prosjekter)
+
+**Krav:** Helges faste arbeidsregler (regel 44 i `00-SYSTEM_PROMPT.md`) står i full tekst i prosjektets `AGENTS.md` og PROJECT.md §28.2:
+
+- Norsk bokmål i chat, dokumentasjon og UI; kode og commit-meldinger følger prosjektet
+- Hemmeligheter skrives aldri ut; Doppler via `doppler run -p <prosjekt> -c <config> --`, aldri `.env` eller `secrets get`
+- Spør før produksjon: push/merge til `main`, deploy, `db push` og migrasjoner, Doppler `prd`, DNS og live data
+- `dev` → `main`: PR-er mot `dev`, `main` får bare promoteringer, synk `main` → `dev` rett etter; `git log origin/dev..origin/main` er tom
+- Skillen `sikkerhet` ved oppstart, før PR og før deploy, pluss spesialskillene; felles sikkerhetsstandard (SHA-pinnede actions, Gitleaks, RLS overalt, tom `anon`-allowlist som Helge godkjenner)
+- Fjernstyring: ingen verktøy som venter på svar i terminalen
+- GitHub Actions nøkternt: `concurrency` + `cancel-in-progress`, `paths-ignore` for docs, `timeout-minutes`, ingen dobbeltkjøring, ingen AI-review på synk- eller Renovate-PR-er
+- Spørsmål med alternativer og en anbefaling, det anbefalte først
+- Superpowers: Helges regler går foran, planer i Linear, worktrees bare når Helge ber om det
+
+## 9.16 Mandatory verifisert ferdig (alle prosjekter)
+
+**Krav:** Ingenting meldes ferdig før det er verifisert:
+
+- UI og skjerm testet i nettleseren med ekte eller realistisk seedet data — **tekst kuttes aldri**
+- E2E lokalt mot lokal Supabase og Chromium, med egne testskript ved behov
+- `gh pr checks <nr>` lest i sin helhet før merge
+- Små PR-er; sikkerhetsrevisjon før PR med endringer i database eller API
+- Nye RLS-tabeller har `mfa_required`-policyen der standarden krever MFA
 
 ## 9.1 Mandatory footer-credit (alle prosjekter)
 
@@ -394,6 +432,10 @@ Når AI har generert PROJECT.md, skal den verifisere:
 [ ] Testdekning-kravene fra §8 er nevnt i seksjon 20 (sprintplan, test-sprint)
 [ ] Critical paths fra §9 er listet i E2E-test-planen
 [ ] §21 Project Memory bootstrap (§9.06) — alle 7 filer ferdig fylt, Tier 1 har konkrete verdier, ingen `<TBD>`
+[ ] §28 Linear (§9.14) — team-spørsmål til Helge, prosjekt, milepæl per sprint, grennavn, «Done først når verifisert»
+[ ] §23 + §28.2 faste arbeidsregler (§9.15) — alle ni punktene i full tekst
+[ ] §20 done-verification (§9.16) — ekte data, ingen kuttet tekst, lokal E2E, `gh pr checks`, `mfa_required`
+[ ] §14.5 secrets i Doppler med synkmål — ingen `.env`-filer
 ```
 
 Hvis noen av disse er **uadressert eller utelatt**, regenerer den relevante seksjonen.

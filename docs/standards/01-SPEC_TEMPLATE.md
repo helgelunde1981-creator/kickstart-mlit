@@ -489,55 +489,53 @@ Per side i CMS, redigerbart:
 
 [Turnstile + honeypot + Zod + rate-limit per skjema.]
 
-### 14.5 Secrets — 3-stedssync
+### 14.5 Secrets — Doppler som eneste kilde
 
-[Følg `06-SECTION_DETAILS/vercel-cli-and-secrets.md`. **AI skal selv** sette secrets via Vercel CLI + `gh secret set` — ikke be brukeren gå i Dashboard. Hver secret må settes **tre steder samtidig**: `.env.local` + Vercel (Production + Preview + Development) + GitHub Actions.]
+[**Doppler er eneste kilde** (regel 17). Lokalt: `doppler run -p {{repo_name}} -c dev -- pnpm dev`. Vercel og GitHub Actions får verdiene via Doppler-integrasjonene (Vercel-synk og GitHub-synk), satt opp i Sprint 0 før noen variabel legges rett i Vercel. **Ingen `.env`/`.env.local`-filer, aldri `doppler secrets get`/`download`, og ingen verdi skrives ut i chat, logg eller fil.** Endringer i `prd` krever ja fra Helge.]
 
-| Secret | Bruk | .env.local | Vercel (3 env) | GH secret |
-|--------|------|------------|----------------|-----------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Klient + server | ✓ | ✓ | ✓ |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Klient | ✓ | ✓ | ✓ |
-| `SUPABASE_SERVICE_ROLE_KEY` | Server-only | ✓ | ✓ | ✓ |
-| `SUPABASE_ACCESS_TOKEN` | Migrations workflow | — | — | ✓ |
-| `SUPABASE_PROJECT_REF` | Workflow id | — | — | ✓ |
-| `SUPABASE_DEV_DB_URL` | Dev-branch | — | — | ✓ |
-| `RESEND_API_KEY` | Email-send | ✓ | ✓ | ✓ |
-| `RESEND_FROM_EMAIL` | Sender | ✓ | ✓ | ✓ |
-| `TURNSTILE_SITE_KEY` | Public anti-spam | ✓ | ✓ | ✓ |
-| `TURNSTILE_SECRET_KEY` | Server anti-spam | ✓ | ✓ | ✓ |
-| `UPSTASH_REDIS_REST_URL` | Rate-limit | ✓ | ✓ | ✓ |
-| `UPSTASH_REDIS_REST_TOKEN` | Rate-limit | ✓ | ✓ | ✓ |
-| `NEXT_PUBLIC_SITE_URL` | Absolutt URLs | ✓ | ✓ | ✓ |
-| `CRON_SECRET` | Vercel Cron auth | ✓ | ✓ | ✓ |
+| Secret | Bruk | Doppler-config | Vercel (via synk) | GitHub Actions (via synk) |
+|--------|------|----------------|-------------------|---------------------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Klient + server | `dev` + `prd` | ✓ | ✓ |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Klient | `dev` + `prd` | ✓ | ✓ |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only | `dev` + `prd` | ✓ | ✓ |
+| `SUPABASE_ACCESS_TOKEN` | Migrations workflow | `prd` | — | ✓ |
+| `SUPABASE_PROJECT_REF` | Workflow id | `prd` | — | ✓ |
+| `SUPABASE_DEV_DB_URL` | Dev-branch | `dev` | — | ✓ |
+| `RESEND_API_KEY` | Email-send | `dev` + `prd` | ✓ | ✓ |
+| `RESEND_FROM_EMAIL` | Sender | `dev` + `prd` | ✓ | ✓ |
+| `TURNSTILE_SITE_KEY` | Public anti-spam | `dev` + `prd` | ✓ | ✓ |
+| `TURNSTILE_SECRET_KEY` | Server anti-spam | `dev` + `prd` | ✓ | ✓ |
+| `UPSTASH_REDIS_REST_URL` | Rate-limit | `dev` + `prd` | ✓ | ✓ |
+| `UPSTASH_REDIS_REST_TOKEN` | Rate-limit | `dev` + `prd` | ✓ | ✓ |
+| `NEXT_PUBLIC_SITE_URL` | Absolutt URLs | `dev` + `prd` | ✓ | ✓ |
+| `CRON_SECRET` | Vercel Cron auth | `dev` + `prd` | ✓ | ✓ |
 | [+ prosjektspesifikke] | | | | |
 
-**Initial-setup-script** (kjøres på Sprint 0):
+**Initial-oppsett** (kjøres i Sprint 0):
 
 ```bash
-# AI: erstatt verdiene før kjøring
-TOKEN="$env:VERCEL_TOKEN"  # Sett VERCEL_TOKEN som Windows-miljøvariabel
-REPO=helgelunde1981-creator/[prosjekt-repo]
+# Doppler-prosjekt (configene dev og prd følger med)
+doppler projects create {{repo_name}}
 
-for SECRET_PAIR in \
-  "NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co" \
-  "SUPABASE_SERVICE_ROLE_KEY=eyJxxx" \
-  ; do
-  NAME="${SECRET_PAIR%%=*}"
-  VALUE="${SECRET_PAIR#*=}"
-  echo "$NAME=\"$VALUE\"" >> .env.local
-  for ENV in production preview development; do
-    printf "%s" "$VALUE" | npx vercel env add "$NAME" "$ENV" --token "$TOKEN"
-  done
-  gh secret set "$NAME" --body "$VALUE" -R "$REPO"
-done
+# Nye verdier skrives via stdin — aldri som argument, aldri ut i loggen.
+# $VERDI kommer rett fra kilden (f.eks. Supabase Management API), ikke fra chatten.
+printf '%s' "$VERDI" | doppler secrets set SUPABASE_SERVICE_ROLE_KEY -p {{repo_name}} -c dev
+printf '%s' "$VERDI" | doppler secrets set SUPABASE_SERVICE_ROLE_KEY -p {{repo_name}} -c prd   # prd: ja fra Helge først
 
-# Bekreft alle 3
-grep "^NEXT_PUBLIC_SUPABASE_URL=" .env.local | head -1
-npx vercel env ls --token "$TOKEN" | grep NEXT_PUBLIC_SUPABASE_URL
-gh secret list -R "$REPO" | grep NEXT_PUBLIC_SUPABASE_URL
+# Synk: Doppler dev → Vercel Preview + Development, Doppler prd → Vercel Production,
+# og Doppler → GitHub Actions. Settes opp i Doppler-integrasjonene FØR noen variabel
+# legges rett i Vercel — en verdi lagt rett i Vercel blir slettet av neste synk.
+
+# Bekreft uten å vise verdier
+doppler secrets --only-names -p {{repo_name}} -c prd
+npx vercel env ls
+gh secret list -R helgelunde1981-creator/{{repo_name}}
+
+# Lokal kjøring
+doppler run -p {{repo_name}} -c dev -- pnpm dev
 ```
 
-**`.gitignore`** må inkludere `.env`, `.env.local`, `.env.*.local`.
+**`.gitignore`** inkluderer likevel `.env*` som sikkerhetsnett — ingen slike filer skal finnes.
 
 ### 14.6 Rate-limiting
 
@@ -681,11 +679,13 @@ Mappestruktur: `emails/{auth,transactional,marketing}/*.tsx`.
 
 ### 19.1 Branching
 
-- `main` → produksjon (Vercel + Supabase prod)
-- `dev` → preview/staging (Vercel preview + Supabase dev-branch)
-- `feature/*` → PR mot `dev`
+- `main` → produksjon (Vercel + Supabase prod). Får bare promoteringer fra `dev` (eller en hastefiks).
+- `dev` → preview/staging (Vercel preview + Supabase dev-branch). Alle grener lages herfra.
+- Arbeidsgrener får navnet Linear foreslår for saken: `helgelunde1981/<nøkkel>-<nr>-<kort-navn>` → PR mot `dev`. PR-en kobles til Linear-saken automatisk.
+- Rett etter at en promotering `dev` → `main` er merget: PR `main` → `dev`, så merge-commiten også ligger i `dev`. `git log origin/dev..origin/main` skal være tom.
+- Aldri force-push til `dev` eller `main`.
 
-PR-krav: minst 1 review + alle CI-sjekker grønne.
+PR-krav: små PR-er (én sak, én PR), alle CI-sjekker grønne — lest i sin helhet med `gh pr checks <nr>` — og sikkerhetsrevisjon (`sikkerhet` + `sikker-database`) før PR-en åpnes når den rører database eller API. Push eller merge til `main` krever ja fra Helge.
 
 ### 19.1.1 Migrasjoner — KUN via GitHub Actions + Supabase Branching
 
@@ -740,6 +740,17 @@ Jobber (i denne rekkefølgen):
 6. lighthouse (med assertions fra `04-QUALITY_GATES.md`)
 7. supabase-migrate (på push til dev/main)
 
+Regler for alle workflows (Helges faste regler, regel 44):
+
+- `concurrency` med `cancel-in-progress: true` per gren/PR
+- `paths-ignore` for rene dok-endringer (`**/*.md`, `docs/**`)
+- `timeout-minutes` på hver jobb
+- Triggere: `pull_request` + `push` til `dev`/`main` — ikke i tillegg på push til feature-grener
+- Små jobber slås sammen (hver jobb faktureres som minst 1 minutt)
+- Renovate-workflows bare på Renovate-PR-er; AI-review ikke på synk-PR-er (`main` → `dev`) eller Renovate-PR-er
+- Hver `uses:` pinnes til full 40-tegns commit-SHA med versjonskommentar: `uses: actions/checkout@<sha> # v5`
+- Gitleaks kjører på alle PR-er (felles sikkerhetsstandard)
+
 ### 19.3 Vercel auto-deploy
 
 - main → produksjon
@@ -748,21 +759,23 @@ Jobber (i denne rekkefølgen):
 
 ### 19.4 Secrets-flyt
 
-- `.env.local` (gitignored)
-- `vercel env add NAVN` per environment
-- `gh secret set NAVN`
+- Doppler er eneste kilde: `printf '%s' "$VERDI" | doppler secrets set NAVN -p {{repo_name}} -c <dev|prd>`
+- Vercel og GitHub Actions oppdateres av Doppler-synken — ikke `vercel env add` eller `gh secret set` for hånd
+- Lokalt: `doppler run -p {{repo_name}} -c dev -- <kommando>`. Ingen `.env`-filer.
 
-[Liste alle secrets fra §14.5 med kommandoer.]
+[Liste alle secrets fra §14.5 med Doppler-config og synkmål.]
 
 ---
 
 ## 20. Sprintplan
 
-[**Følg `06-SECTION_DETAILS/sprint-planning.md` fullt ut.** Hver eneste oppgave fra alle 19 regler + alle 04-QUALITY_GATES-sjekklister + alle fragmenter skal være eksplisitt bullet i en sprint. Ingen «osv.». Hver sprint har mål, varighet, avhengigheter, oppgaver (eksplisitt), test-kriterier, og leveranse.]
+[**Følg `06-SECTION_DETAILS/sprint-planning.md` fullt ut.** Hver eneste oppgave fra alle reglene + alle 04-QUALITY_GATES-sjekklister + alle fragmenter skal være eksplisitt bullet i en sprint. Ingen «osv.». Hver sprint har mål, varighet, avhengigheter, oppgaver (eksplisitt), test-kriterier, og leveranse.]
 
 Basert på `sprint_estimate` fra kundedata. Standard mal:
 
 ### Sprint 0 — Grunnmur (1 dag)
+- [ ] Linear satt opp (regel 43): team avklart med Helge, prosjekt opprettet, én milepæl per sprint, alle sprintoppgaver lagt inn som saker
+- [ ] Skillen `sikkerhet` kjørt ved oppstart (+ relevante spesialskills)
 - [ ] GitHub repo opprettet
 - [ ] Next.js 15 scaffolded
 - [ ] Dependencies installert
@@ -770,7 +783,9 @@ Basert på `sprint_estimate` fra kundedata. Standard mal:
 - [ ] Vercel prosjekt opprettet + auto-deploy aktivert
 - [ ] Resend domain verifisert
 - [ ] Turnstile-konto + keys
-- [ ] `.env.local` + Vercel env + GitHub secrets satt
+- [ ] Doppler-prosjekt opprettet (`dev` + `prd`), alle secrets satt via stdin, Vercel- og GitHub-synk aktiv — ingen `.env`-filer
+- [ ] `dev`-gren opprettet og satt som utgangspunkt for alle arbeidsgrener; `main` beskyttet
+- [ ] Felles sikkerhetsstandard: actions pinnet til full SHA, Gitleaks på PR-er, baseline-migrasjon som fjerner `anon` sin standardtilgang, tom `anon`-allowlist
 - [ ] Obsidian-vault auto-registrering kjørt
 - [ ] CI/CD pipeline grønn
 - **Leveranse:** Tom Next.js-app deployer automatisk
@@ -830,6 +845,11 @@ Ingen sprint kan rapporteres som ferdig uten:
 - [ ] CI `.github/workflows/quality-gate.yml` grønn på siste PR mot dev
 - [ ] `docs/sprint-reports/sprint-<N>-quality.md` committed med per-side score
 - [ ] Hvis snitt <9.0: gjenta sprinten med fokus på topp-3 manglene fra rapporten
+- [ ] UI verifisert i nettleseren med ekte eller realistisk seedet data, screenshot på de viewportene/skjermene løsningen vises på — **ingen tekst kuttet** (testet med de lengste verdiene i dataene)
+- [ ] E2E kjørt lokalt mot lokal Supabase (`supabase start`) og Chromium, med egne testskript i `scripts/` der suiten ikke dekker flyten
+- [ ] `gh pr checks <nr>` lest i sin helhet før hver merge — ingen røde eller ventende sjekker
+- [ ] Nye RLS-tabeller har `mfa_required`-policyen der prosjektets standard krever MFA
+- [ ] Linear-sakene for sprinten satt til Done **først etter** verifisering; hendelser og nye ønsker fra sprinten lagt inn som nye saker
 
 **Forbud:** «Det ser bra ut i koden», «ingen feil i koden», «burde være riktig» — åpne siden, mål, iterer. Full standard i `06-SECTION_DETAILS/sprint-done-verification.md`.
 
@@ -913,9 +933,11 @@ metadata:
 # Supabase SQL mot prod (via CLI, aldri MCP)
 npx supabase db execute --project-ref {{supabase_prod_ref}} -f fil.sql
 
-# Vercel CLI (token via VERCEL_TOKEN env-var eller allerede innlogget med 'vercel login')
-TOKEN="$env:VERCEL_TOKEN"  # Sett VERCEL_TOKEN som Windows-miljøvariabel
-npx vercel env add NAVN production --token "$TOKEN"
+# Kjør lokalt med hemmeligheter fra Doppler (ingen .env-filer)
+doppler run -p {{repo_name}} -c dev -- pnpm dev
+
+# Se hvilke hemmeligheter som finnes — aldri verdiene
+doppler secrets --only-names -p {{repo_name}} -c prd
 ```
 ```
 
@@ -956,28 +978,22 @@ metadata:
 
 # Secrets-strategi
 
-Hver secret skal eksistere på alle tre steder:
-1. `.env.local` (lokalt, gitignored)
-2. Vercel env vars (Production + Preview + Development)
-3. GitHub Actions secrets (`gh secret set`)
+Doppler er eneste kilde (prosjekt `{{repo_name}}`, configene `dev` og `prd`).
+Vercel og GitHub Actions får verdiene via Doppler-synken. Det finnes ingen
+`.env`-filer, og verdier skrives aldri ut i chat, logg eller fil.
 
 ## Default-snippet for å sette en ny secret
 
 ```bash
-NAME=MIN_SECRET
-VALUE=hemmelig_verdi
+# Verdien skrives via stdin — aldri som argument, aldri ut i loggen
+printf '%s' "$VERDI" | doppler secrets set MIN_SECRET -p {{repo_name}} -c dev
+printf '%s' "$VERDI" | doppler secrets set MIN_SECRET -p {{repo_name}} -c prd   # prd: ja fra Helge først
 
-# 1) .env.local
-echo "$NAME=$VALUE" >> .env.local
+# Bekreft at den finnes — uten å vise verdien
+doppler secrets --only-names -p {{repo_name}} -c dev | grep MIN_SECRET
 
-# 2) Vercel (alle tre miljøer)
-TOKEN="$env:VERCEL_TOKEN"  # Sett VERCEL_TOKEN som Windows-miljøvariabel
-echo "$VALUE" | npx vercel env add $NAME production --token "$TOKEN"
-echo "$VALUE" | npx vercel env add $NAME preview --token "$TOKEN"
-echo "$VALUE" | npx vercel env add $NAME development --token "$TOKEN"
-
-# 3) GitHub Actions
-gh secret set $NAME --body "$VALUE"
+# Kjør lokalt
+doppler run -p {{repo_name}} -c dev -- pnpm dev
 ```
 
 ## Spesielle plasseringer (overstyrer default)
@@ -1130,6 +1146,8 @@ Action poster en markdown-tabell som PR-kommentar med 0-10 score per dimensjon +
 5. **Stack-snapshot:** versjoner og valg
 6. **Conventions:** branch-flyt, commit-format, migrasjons-filnavn
 7. **Quality gates:** referanse til §22
+8. **Helges faste arbeidsregler (regel 44) i full tekst:** språk, hemmeligheter via Doppler, spør før produksjon, `dev` → `main` med synk tilbake, sikkerhet + felles sikkerhetsstandard, fjernstyring, nøkterne GitHub Actions, spørsmål med anbefaling, Superpowers
+9. **Linear (regel 43) og «verifisert ferdig» (regel 45):** pekere til §28
 
 Mal i `EXAMPLES/templates/AGENTS.md.example`. AI fyller ut placeholders fra wizard-data.
 
@@ -1236,12 +1254,12 @@ Etter at PROJECT.md er ferdig generert kjører Helge:
 pnpm tsx scripts/create-mlit-project.ts --kickstart-id {{id}}
 ```
 
-CLI-en gjør (idempotent):
+CLI-en gjør (idempotent), etter at Linear-prosjektet er satt opp (§28):
 1. Verifiser kickstart-data
 2. Opprett GitHub repo (helgelunde1981-creator/{{repo_name}})
 3. Opprett Supabase-prosjekt
 4. Koble Vercel project
-5. Distribuer secrets på 3 steder (.env.local + Vercel + GH)
+5. Opprett Doppler-prosjekt (`dev` + `prd`) og sett opp synk til Vercel og GitHub Actions
 6. Første migrasjon + GitHub Actions
 7. Memory bootstrap (kopierer §21-filene inn)
 8. Vault-registrering
@@ -1251,6 +1269,36 @@ CLI-en gjør (idempotent):
 Estimert tid: 5 minutter (vs. 60-90 manuelt).
 
 State-fil i `~/.claude/bootstrap-state/{{repo_name}}/bootstrap-state.json` for å støtte resume etter krasj.
+
+---
+
+## 28. Linear + arbeidsregler
+
+> Regel 43, 44 og 45 i `00-SYSTEM_PROMPT.md`. Denne seksjonen kopieres også inn i `AGENTS.md`.
+
+### 28.1 Linear-oppsett (før Sprint 0)
+
+| Hva | Verdi |
+|-----|-------|
+| Team | [Eget team for {{client_name}} eller felles team — **avklares med Helge før opprettelse**. Skriv spørsmålet med alternativer og anbefaling i «Spørsmål til kunden».] |
+| Prosjekt | {{project_name}} |
+| Milepæler | [Én per sprint i §20: «Sprint 0 — Grunnmur», «Sprint 1 — …», … «Pre-launch»] |
+| Saker | [Hver oppgave i §20 blir én sak under sin milepæl] |
+| Grennavn | `helgelunde1981/<nøkkel>-<nr>-<kort-navn>` (Linear sitt forslag) |
+
+Regler:
+
+- Planen og sakene bor i Linear — ikke i `docs/plans/`, ikke i GitHub Issues. PROJECT.md er specen; Linear er status.
+- En sak settes til Done **først når endringen er verifisert**: CI grønn, testet med ekte data, merget.
+- Hendelser, feil og nye ønsker legges i Linear med en gang.
+
+### 28.2 Helges faste arbeidsregler
+
+[Skriv ut alle ni punktene fra regel 44 i full tekst, tilpasset prosjektet (Doppler-prosjektnavn, hvilke spesialskills som er relevante for stacken).]
+
+### 28.3 Verifisert ferdig
+
+[Skriv ut punktene fra regel 45, tilpasset prosjektet: hvilke viewporter/skjermer som skal screenshottes, hvilke felt som har de lengste verdiene, hvilke E2E-skript som kjøres mot lokal Supabase, og om prosjektet krever MFA (`mfa_required`).]
 
 ---
 
@@ -1291,7 +1339,7 @@ State-fil i `~/.claude/bootstrap-state/{{repo_name}}/bootstrap-state.json` for �
 - [ ] **Regel 14 — Migrasjoner via GitHub Actions:** §19.1.1 spesifiserer flyt + filnavn-konvensjon + workflow-fil + GitHub secrets-liste
 - [ ] **Regel 15 — CMS alt redigerbart:** § 10.5 + § 11 spesifiserer per side hvilke felter som er redigerbart, alle bilder via opplastingsmodul (ikke URL). **§ 11 har CMS-coverage-tabell for HVER public-side** (forside + alle tjeneste-sider + alle sted-sider + alle sted×tjeneste-kombinasjoner + kontakt + blogg + lovpålagt + 404/500). Hver rad har faktisk DB-mapping + redigeringsplass. Maks 3 ✗-statuser per side. `scripts/check-cms-coverage.ts` listet som leveranse
 - [ ] **Regel 16 — Pre-launch sprint:** siste sprint har alle 15 områder fra `06-SECTION_DETAILS/pre-launch-checklist.md` som eksplisitte oppgaver + lanseringsrapport
-- [ ] **Regel 17 — Vercel CLI + 3-stedssync:** §14.5 har secret-tabell med ✓ for hvor hver settes + initial-setup-script
+- [ ] **Regel 17 — Doppler som eneste kilde:** §14.5 har secret-tabell med Doppler-config og synkmål + initial-oppsett via stdin; ingen `.env`-filer, ingen `secrets get`
 - [ ] **Regel 18 — SEO sted×tjeneste-grid (skjulte sider):** §13.1 har full grid hvis lokal virksomhet, datamodell i §12 har `locations` + `services` + `service_locations`, footer-strategi + `/dekningsomrade`-side spesifisert
 - [ ] **Regel 19 — Sprintplan med ALLE oppgaver eksplisitt:** ingen «osv.», hver regel/sjekkliste/side/mal/tabell/kombinasjon/skjema/secret/feature er konkret bullet
 - [ ] **Regel 20 — Project Memory bootstrap:** §21 ferdig med Tier 1-filer fylt, ingen `<TBD>`
@@ -1301,6 +1349,9 @@ State-fil i `~/.claude/bootstrap-state/{{repo_name}}/bootstrap-state.json` for �
 - [ ] **Regel 24 — Pre-launch verify-skript:** §25 har skript listet som steg i siste sprint
 - [ ] **Regel 25 — Post-launch monitoring:** §26 har Plausible + Speed Insights + survey-cron
 - [ ] **Regel 26 — Sprint 0 bootstrap-CLI:** §27 nevner CLI-bruk eksplisitt
+- [ ] **Regel 43 — Linear:** §28.1 har team (spørsmål til Helge), prosjekt, milepæl per sprint, grennavn; Sprint 0 starter med Linear-oppsettet
+- [ ] **Regel 44 — Helges faste arbeidsregler:** alle ni punktene står i full tekst i §23 og §28.2
+- [ ] **Regel 45 — Verifisert ferdig:** done-verification i §20 og §28.3 dekker ekte data, ingen kuttet tekst, lokal E2E, `gh pr checks`, små PR-er, sikkerhetsrevisjon før DB/API-PR, `mfa_required`
 
 ### Quality gates (`04-QUALITY_GATES.md`)
 
@@ -1324,7 +1375,7 @@ State-fil i `~/.claude/bootstrap-state/{{repo_name}}/bootstrap-state.json` for �
 - [ ] **Antall sider:** hvis lokal virksomhet med flere tjenester+steder, antall URLs er > 50, ikke «5-10 sider»
 - [ ] **Antall eposter:** ≥ 8 (auth) + alle transaksjonelle per feature, ikke kun «kontakt + bekreftelse»
 - [ ] **Antall sprint-oppgaver:** hver sprint har ≥ 10 konkrete oppgaver, ikke «implementer X»
-- [ ] **Antall sekrets:** §14.5 har ≥ 15 secrets med 3-stedssync, ikke «sett env vars»
+- [ ] **Antall sekrets:** §14.5 har ≥ 15 secrets med Doppler-config og synkmål, ikke «sett env vars»
 - [ ] **Antall JSON-LD-typer:** § 13.2 har ≥ 5 typer med fullstendige eksempler, ikke kun «JSON-LD»
 - [ ] **Antall E2E-scenarier:** § 20 spesifiserer ≥ 10 scenarier, ikke «Playwright-tester»
 

@@ -73,7 +73,7 @@
 
 ## Standard miljøvariabler
 
-Hvert prosjekt skal ha disse env-vars (sett i `.env.local` + Vercel + GitHub secrets):
+Hvert prosjekt skal ha disse env-vars. De ligger i Doppler (configene `dev` og `prd`) og synkes derfra til Vercel og GitHub Actions. Lokalt: `doppler run -p <prosjekt> -c dev -- pnpm dev`. Ingen `.env`-filer:
 
 ```bash
 # Supabase
@@ -112,7 +112,7 @@ OPENAI_API_KEY=                    # hvis AI-features
 
 AI **må** liste hver env-var som faktisk brukes i prosjektet i seksjon 14 (Sikkerhet) av PROJECT.md med:
 - Hva den brukes til
-- Hvor den settes (.env.local / Vercel / GitHub secrets)
+- Hvilken Doppler-config den ligger i (`dev` / `prd`) og hvor den synkes (Vercel / GitHub Actions)
 - Om den er public (`NEXT_PUBLIC_*`) eller server-only
 
 ## Standard CI/CD pipeline
@@ -154,7 +154,7 @@ Auto-deploy via GitHub Actions ved push:
 - **Team:** `myrvoll-lunde-it-drift-s-projects` for klient-prosjekter, `Helge Myrvoll-Lunde's projects` for personlige
 - **Auto-deploy fra GitHub:** main → prod, dev → preview
 - **Aldri** `vercel deploy` manuelt — push til GitHub
-- **Env vars:** speil av `.env.local`, sett per environment (Production / Preview / Development)
+- **Env vars:** synkes fra Doppler (`dev` → Preview + Development, `prd` → Production). Settes ikke for hånd i Vercel — neste synk sletter dem
 
 ## Standard mappestruktur
 

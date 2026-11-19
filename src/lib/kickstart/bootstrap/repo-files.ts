@@ -72,6 +72,10 @@ står i \`PROJECT.md\` (§23 AGENTS.md). Denne filen er kortversjonen.
 - **Spørsmål** stilles med alternativer og en anbefaling, det anbefalte først.
 - **Superpowers:** disse reglene går foran, planer ligger i Linear, og worktrees
   bare når Helge ber om det.
+- **Slipp i etapper:** hver sak får egen gren og PR med grønn CI, og blir
+  liggende klar. Når 3–5 saker er klare, spør du Helge én gang: merge alle, så
+  én runde med \`db push\`, deploy, OTA og verifisering. Unntak (fortsatt etter
+  ja): feil i drift og sikkerhetsfunn går med en gang.
 
 ## Før du melder ferdig
 

@@ -1146,7 +1146,7 @@ Action poster en markdown-tabell som PR-kommentar med 0-10 score per dimensjon +
 5. **Stack-snapshot:** versjoner og valg
 6. **Conventions:** branch-flyt, commit-format, migrasjons-filnavn
 7. **Quality gates:** referanse til §22
-8. **Helges faste arbeidsregler (regel 44) i full tekst:** språk, hemmeligheter via Doppler, spør før produksjon, `dev` → `main` med synk tilbake, sikkerhet + felles sikkerhetsstandard, fjernstyring, nøkterne GitHub Actions, spørsmål med anbefaling, Superpowers
+8. **Helges faste arbeidsregler (regel 44) i full tekst:** språk, hemmeligheter via Doppler, spør før produksjon, `dev` → `main` med synk tilbake, sikkerhet + felles sikkerhetsstandard, fjernstyring, nøkterne GitHub Actions, spørsmål med anbefaling, Superpowers, slipp i etapper
 9. **Linear (regel 43) og «verifisert ferdig» (regel 45):** pekere til §28
 
 Mal i `EXAMPLES/templates/AGENTS.md.example`. AI fyller ut placeholders fra wizard-data.
@@ -1294,7 +1294,7 @@ Regler:
 
 ### 28.2 Helges faste arbeidsregler
 
-[Skriv ut alle ni punktene fra regel 44 i full tekst, tilpasset prosjektet (Doppler-prosjektnavn, hvilke spesialskills som er relevante for stacken).]
+[Skriv ut alle ti punktene fra regel 44 i full tekst, tilpasset prosjektet (Doppler-prosjektnavn, hvilke spesialskills som er relevante for stacken).]
 
 ### 28.3 Verifisert ferdig
 
@@ -1350,7 +1350,7 @@ Regler:
 - [ ] **Regel 25 — Post-launch monitoring:** §26 har Plausible + Speed Insights + survey-cron
 - [ ] **Regel 26 — Sprint 0 bootstrap-CLI:** §27 nevner CLI-bruk eksplisitt
 - [ ] **Regel 43 — Linear:** §28.1 har team (spørsmål til Helge), prosjekt, milepæl per sprint, grennavn; Sprint 0 starter med Linear-oppsettet
-- [ ] **Regel 44 — Helges faste arbeidsregler:** alle ni punktene står i full tekst i §23 og §28.2
+- [ ] **Regel 44 — Helges faste arbeidsregler:** alle ti punktene står i full tekst i §23 og §28.2
 - [ ] **Regel 45 — Verifisert ferdig:** done-verification i §20 og §28.3 dekker ekte data, ingen kuttet tekst, lokal E2E, `gh pr checks`, små PR-er, sikkerhetsrevisjon før DB/API-PR, `mfa_required`
 
 ### Quality gates (`04-QUALITY_GATES.md`)

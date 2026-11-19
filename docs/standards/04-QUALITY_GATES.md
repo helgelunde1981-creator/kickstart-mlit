@@ -393,6 +393,7 @@ Full standard: `06-SECTION_DETAILS/delivery-score.md`.
 - GitHub Actions nøkternt: `concurrency` + `cancel-in-progress`, `paths-ignore` for docs, `timeout-minutes`, ingen dobbeltkjøring, ingen AI-review på synk- eller Renovate-PR-er
 - Spørsmål med alternativer og en anbefaling, det anbefalte først
 - Superpowers: Helges regler går foran, planer i Linear, worktrees bare når Helge ber om det
+- Slipp i etapper: ferdige PR-er samles og merges/deployes samlet etter ett ja; unntak for driftsfeil og sikkerhetsfunn
 
 ## 9.16 Mandatory verifisert ferdig (alle prosjekter)
 
@@ -433,7 +434,7 @@ Når AI har generert PROJECT.md, skal den verifisere:
 [ ] Critical paths fra §9 er listet i E2E-test-planen
 [ ] §21 Project Memory bootstrap (§9.06) — alle 7 filer ferdig fylt, Tier 1 har konkrete verdier, ingen `<TBD>`
 [ ] §28 Linear (§9.14) — team-spørsmål til Helge, prosjekt, milepæl per sprint, grennavn, «Done først når verifisert»
-[ ] §23 + §28.2 faste arbeidsregler (§9.15) — alle ni punktene i full tekst
+[ ] §23 + §28.2 faste arbeidsregler (§9.15) — alle ti punktene i full tekst
 [ ] §20 done-verification (§9.16) — ekte data, ingen kuttet tekst, lokal E2E, `gh pr checks`, `mfa_required`
 [ ] §14.5 secrets i Doppler med synkmål — ingen `.env`-filer
 ```

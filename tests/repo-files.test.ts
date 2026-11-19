@@ -35,6 +35,7 @@ describe("buildAgentsMd", () => {
       "`cancel-in-progress`",
       "alternativer og en anbefaling",
       "worktrees",
+      "**Slipp i etapper:**",
     ]) {
       expect(md).toContain(regel);
     }

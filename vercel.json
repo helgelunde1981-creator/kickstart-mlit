@@ -1,4 +1,5 @@
 {
+  "ignoreCommand": "bash scripts/vercel-ignore.sh ':(exclude)supabase/**'",
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
